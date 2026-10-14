@@ -59,7 +59,8 @@ class UtilitiesPage extends StatelessWidget {
             ),
           ),
         ],
-        for (final m in readings.reversed) _ReadingTile(reading: m, bill: store.billFor(m)),
+        if (readings.isNotEmpty)
+          _ReadingsList(rows: [for (final m in readings.reversed) (m, store.billFor(m))]),
       ],
     );
 
@@ -236,6 +237,144 @@ class _PeriodCard extends StatelessWidget {
   }
 }
 
+/// Показания по месяцам с расходом за месяц (дельтами), как в таблице.
+/// Широко — колонками, узко — строками с подписью.
+class _ReadingsList extends StatelessWidget {
+  const _ReadingsList({required this.rows});
+
+  final List<(MeterReading, UtilityBill?)> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, c) {
+      if (c.maxWidth >= 520) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _TableHeader(),
+            const Divider(height: 1),
+            for (final (m, b) in rows) _TableRow(reading: m, bill: b),
+          ],
+        );
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [for (final (m, b) in rows) _ReadingTile(reading: m, bill: b)],
+      );
+    });
+  }
+}
+
+// Ширина колонок таблицы показаний.
+const _fMonth = 5, _fMeter = 3, _fHeat = 3, _fSum = 4;
+
+class _TableHeader extends StatelessWidget {
+  const _TableHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final style = t.textTheme.labelMedium?.copyWith(color: t.colorScheme.onSurfaceVariant);
+    Widget cell(String text, int flex, {bool right = true}) => Expanded(
+          flex: flex,
+          child: Text(text, style: style, textAlign: right ? TextAlign.right : TextAlign.left),
+        );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Row(
+        children: [
+          cell('Месяц', _fMonth, right: false),
+          cell('Ванна, м³', _fMeter),
+          cell('Кухня, м³', _fMeter),
+          cell('Эл, кВт·ч', _fMeter),
+          cell('Отопл., ₴', _fHeat),
+          cell('Сумма, ₴', _fSum),
+        ],
+      ),
+    );
+  }
+}
+
+class _TableRow extends StatelessWidget {
+  const _TableRow({required this.reading, required this.bill});
+
+  final MeterReading reading;
+  final UtilityBill? bill;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final m = reading;
+    final b = bill;
+    final muted = t.colorScheme.onSurfaceVariant;
+    final main = t.textTheme.bodyLarge?.copyWith(fontFeatures: tabular);
+    final small = t.textTheme.bodySmall?.copyWith(color: muted, fontFeatures: tabular);
+
+    // Расход за месяц крупно, само показание счётчика — мелко под ним.
+    Widget meter(double? used, double value) => Expanded(
+          flex: _fMeter,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                used == null ? '—' : numStr(used),
+                style: main?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: used == null ? muted : (used < 0 ? t.colorScheme.error : null),
+                ),
+              ),
+              Text(numStr(value), style: small, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ],
+          ),
+        );
+
+    return InkWell(
+      onTap: () => showReadingEditor(context, existing: m),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            Expanded(
+              flex: _fMonth,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(monthTitle(m.date), style: main, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(fmtDate(m.date), style: small),
+                ],
+              ),
+            ),
+            meter(b?.bathUsed, m.bath),
+            meter(b?.kitchenUsed, m.kitchen),
+            meter(b?.elUsed, m.el),
+            Expanded(
+              flex: _fHeat,
+              child: Text(
+                m.heating > 0 ? money(m.heating, currency: false) : '—',
+                textAlign: TextAlign.right,
+                style: main?.copyWith(color: m.heating > 0 ? null : muted),
+              ),
+            ),
+            Expanded(
+              flex: _fSum,
+              child: Text(
+                b == null ? 'база' : moneyCents(b.total, currency: false),
+                textAlign: TextAlign.right,
+                style: main?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: b == null ? muted : (b.hasNegative ? t.colorScheme.error : null),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ReadingTile extends StatelessWidget {
   const _ReadingTile({required this.reading, required this.bill});
 
@@ -249,7 +388,8 @@ class _ReadingTile extends StatelessWidget {
     final b = bill;
     final parts = <String>[
       if (b != null) ...[
-        'вода ${numStr(b.waterUsed)} м³',
+        'ванна ${numStr(b.bathUsed)} м³',
+        'кухня ${numStr(b.kitchenUsed)} м³',
         'свет ${numStr(b.elUsed)} кВт·ч',
         if (b.heating > 0) 'отопл. ${money(b.heating)}',
       ] else

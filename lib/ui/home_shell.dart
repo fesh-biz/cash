@@ -29,7 +29,7 @@ class _HomeShellState extends State<HomeShell> {
     (Icons.today_outlined, Icons.today, 'Бюджет'),
     (Icons.credit_card_outlined, Icons.credit_card, 'Кредиты'),
     (Icons.tune_outlined, Icons.tune, 'Период'),
-    (Icons.water_drop_outlined, Icons.water_drop, 'Коммуналка'),
+    (Icons.receipt_long_outlined, Icons.receipt_long, 'Коммуналка'),
     (Icons.sync_outlined, Icons.sync, 'Синхронизация'),
   ];
 
@@ -47,6 +47,15 @@ class _HomeShellState extends State<HomeShell> {
         final now = DateTime.now();
         final period = store.periodById(_periodId) ?? store.defaultPeriod(now);
         final isCurrent = period != null && period.contains(now);
+        final utilitiesDue = _utilitiesDue(now);
+
+        // Значок вкладки; на «Коммуналке» — точка, когда пора снять показания.
+        Widget navIcon(int i, {required bool selected}) {
+          final d = _destinations[i];
+          final icon = Icon(selected ? d.$2 : d.$1);
+          if (i != _utilitiesTab) return icon;
+          return Badge(isLabelVisible: utilitiesDue, child: icon);
+        }
 
         final pages = <Widget>[
           OverviewPage(
@@ -55,7 +64,7 @@ class _HomeShellState extends State<HomeShell> {
             onSelectPeriod: _selectPeriod,
           ),
           CreditsPage(period: period),
-          PeriodPage(period: period, onSelectPeriod: _selectPeriod, onOpenUtilities: () => _goTab(3)),
+          PeriodPage(period: period, onSelectPeriod: _selectPeriod, onOpenUtilities: () => _goTab(_utilitiesTab)),
           UtilitiesPage(period: period),
           const SyncPage(),
         ];
@@ -94,8 +103,12 @@ class _HomeShellState extends State<HomeShell> {
                   onDestinationSelected: _goTab,
                   labelType: NavigationRailLabelType.all,
                   destinations: [
-                    for (final d in _destinations)
-                      NavigationRailDestination(icon: Icon(d.$1), selectedIcon: Icon(d.$2), label: Text(d.$3)),
+                    for (var i = 0; i < _destinations.length; i++)
+                      NavigationRailDestination(
+                        icon: navIcon(i, selected: false),
+                        selectedIcon: navIcon(i, selected: true),
+                        label: Text(_destinations[i].$3),
+                      ),
                   ],
                 ),
                 const VerticalDivider(width: 1),
@@ -112,8 +125,12 @@ class _HomeShellState extends State<HomeShell> {
               selectedIndex: _tab,
               onDestinationSelected: _goTab,
               destinations: [
-                for (final d in _destinations)
-                  NavigationDestination(icon: Icon(d.$1), selectedIcon: Icon(d.$2), label: d.$3),
+                for (var i = 0; i < _destinations.length; i++)
+                  NavigationDestination(
+                    icon: navIcon(i, selected: false),
+                    selectedIcon: navIcon(i, selected: true),
+                    label: _destinations[i].$3,
+                  ),
               ],
             ),
           );
@@ -134,6 +151,16 @@ class _HomeShellState extends State<HomeShell> {
         );
       },
     );
+  }
+
+  static const _utilitiesTab = 3;
+
+  /// В текущем периоде наступило 28-е, а показаний ещё нет.
+  bool _utilitiesDue(DateTime now) {
+    final store = AppScope.of(context).store;
+    final p = store.periodFor(now);
+    if (p == null || store.utilitiesItemOf(p.id) == null) return false;
+    return store.utilityStatus(p).isDue(now);
   }
 
   DateTime _defaultExpenseDate(Period p) {

@@ -306,7 +306,7 @@ class PeriodPage extends StatelessWidget {
           if (onOpenUtilities != null)
             SimpleDialogOption(
               onPressed: () => Navigator.pop(ctx, 'open'),
-              child: const ListTile(leading: Icon(Icons.water_drop_outlined), title: Text('Открыть «Коммуналка»')),
+              child: const ListTile(leading: Icon(Icons.receipt_long_outlined), title: Text('Открыть «Коммуналка»')),
             ),
           SimpleDialogOption(
             onPressed: () => Navigator.pop(ctx, 'manual'),
