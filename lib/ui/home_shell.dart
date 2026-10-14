@@ -9,6 +9,7 @@ import 'expense_editor.dart';
 import 'overview_page.dart';
 import 'period_page.dart';
 import 'sync_page.dart';
+import 'utilities_page.dart';
 
 /// Главный экран: навигация снизу (телефон) или сбоку (Windows/планшет).
 class HomeShell extends StatefulWidget {
@@ -28,6 +29,7 @@ class _HomeShellState extends State<HomeShell> {
     (Icons.today_outlined, Icons.today, 'Бюджет'),
     (Icons.credit_card_outlined, Icons.credit_card, 'Кредиты'),
     (Icons.tune_outlined, Icons.tune, 'Период'),
+    (Icons.water_drop_outlined, Icons.water_drop, 'Коммуналка'),
     (Icons.sync_outlined, Icons.sync, 'Синхронизация'),
   ];
 
@@ -53,7 +55,8 @@ class _HomeShellState extends State<HomeShell> {
             onSelectPeriod: _selectPeriod,
           ),
           CreditsPage(period: period),
-          PeriodPage(period: period, onSelectPeriod: _selectPeriod),
+          PeriodPage(period: period, onSelectPeriod: _selectPeriod, onOpenUtilities: () => _goTab(3)),
+          UtilitiesPage(period: period),
           const SyncPage(),
         ];
 
@@ -125,6 +128,7 @@ class _HomeShellState extends State<HomeShell> {
             const SingleActivator(LogicalKeyboardKey.digit2, control: true): () => _goTab(1),
             const SingleActivator(LogicalKeyboardKey.digit3, control: true): () => _goTab(2),
             const SingleActivator(LogicalKeyboardKey.digit4, control: true): () => _goTab(3),
+            const SingleActivator(LogicalKeyboardKey.digit5, control: true): () => _goTab(4),
           },
           child: Focus(autofocus: true, child: scaffold),
         );

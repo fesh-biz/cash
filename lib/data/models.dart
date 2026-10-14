@@ -8,6 +8,21 @@ abstract final class RecType {
   static const expense = 'expense';
   static const credit = 'credit';
   static const deposit = 'deposit';
+
+  /// Показания счётчиков за месяц.
+  static const meter = 'meter';
+
+  /// Тарифы коммуналки и сумма по умолчанию (одна запись на все устройства).
+  static const utilConfig = 'utilConfig';
+}
+
+/// Вид обязательного расхода.
+abstract final class FixedKind {
+  /// Сумма вводится вручную.
+  static const manual = 'manual';
+
+  /// Коммуналка: сумма по показаниям счётчиков, а до них — план по умолчанию.
+  static const utilities = 'utilities';
 }
 
 double _d(Object? v) {
@@ -104,13 +119,41 @@ class FixedExpense {
     required this.name,
     required this.amount,
     this.order = 0,
+    this.kind = '',
+    this.isActual = false,
+    this.readingDate,
   });
 
   final String id;
   final String periodId;
   final String name;
+
+  /// Сумма. Для коммуналки — уже посчитанная: факт по показаниям или план.
   final double amount;
   final int order;
+
+  /// [FixedKind]; пусто — старая запись (коммуналка узнаётся по названию).
+  final String kind;
+
+  /// Коммуналка: сумма посчитана по показаниям (а не план по умолчанию).
+  final bool isActual;
+
+  /// Коммуналка: дата показаний, по которым посчитана сумма.
+  final DateTime? readingDate;
+
+  bool get isUtilities =>
+      kind == FixedKind.utilities || (kind.isEmpty && name.toLowerCase().contains('коммунал'));
+
+  FixedExpense resolved({required double amount, required bool isActual, DateTime? readingDate}) => FixedExpense(
+        id: id,
+        periodId: periodId,
+        name: name,
+        amount: amount,
+        order: order,
+        kind: kind,
+        isActual: isActual,
+        readingDate: readingDate,
+      );
 
   static FixedExpense fromRecord(SyncRecord r) => FixedExpense(
         id: r.id,
@@ -118,6 +161,7 @@ class FixedExpense {
         name: _s(r.data['name']),
         amount: _d(r.data['amount']),
         order: _i(r.data['order']),
+        kind: _s(r.data['kind']),
       );
 
   Map<String, dynamic> toData() => {
@@ -125,6 +169,7 @@ class FixedExpense {
         'name': name,
         'amount': amount,
         'order': order,
+        if (kind.isNotEmpty) 'kind': kind,
       };
 }
 
@@ -278,5 +323,206 @@ class CreditDeposit {
         'date': dateKey(date),
         'amount': amount,
         'note': note,
+      };
+}
+
+double? _dn(Object? v) {
+  if (v is num) return v.toDouble();
+  if (v is String) return double.tryParse(v);
+  return null;
+}
+
+/// Тарифы коммуналки (столбцы L–P исходной таблицы).
+class UtilityTariffs {
+  const UtilityTariffs({
+    required this.waterSubIn,
+    required this.waterSubOut,
+    required this.cubeIn,
+    required this.cubeOut,
+    required this.kwh,
+    required this.housing,
+  });
+
+  /// Абонплата за подачу воды («Абон вход»), в месяц.
+  final double waterSubIn;
+
+  /// Абонплата за водоотведение («Абон выход»), в месяц.
+  final double waterSubOut;
+
+  /// За 1 м³ воды («Куб вход»).
+  final double cubeIn;
+
+  /// За 1 м³ водоотведения («Куб выход»).
+  final double cubeOut;
+
+  /// За 1 кВт·ч.
+  final double kwh;
+
+  /// Абонплата ЖКХ, в месяц.
+  final double housing;
+
+  /// Тарифы из таблицы.
+  static const initial = UtilityTariffs(
+    waterSubIn: 27.3,
+    waterSubOut: 23.58,
+    cubeIn: 36.9,
+    cubeOut: 58.2,
+    kwh: 4.32,
+    housing: 700,
+  );
+
+  UtilityTariffs copyWith({
+    double? waterSubIn,
+    double? waterSubOut,
+    double? cubeIn,
+    double? cubeOut,
+    double? kwh,
+    double? housing,
+  }) =>
+      UtilityTariffs(
+        waterSubIn: waterSubIn ?? this.waterSubIn,
+        waterSubOut: waterSubOut ?? this.waterSubOut,
+        cubeIn: cubeIn ?? this.cubeIn,
+        cubeOut: cubeOut ?? this.cubeOut,
+        kwh: kwh ?? this.kwh,
+        housing: housing ?? this.housing,
+      );
+
+  bool sameAs(UtilityTariffs o) =>
+      waterSubIn == o.waterSubIn &&
+      waterSubOut == o.waterSubOut &&
+      cubeIn == o.cubeIn &&
+      cubeOut == o.cubeOut &&
+      kwh == o.kwh &&
+      housing == o.housing;
+
+  /// Отсутствующие значения берутся из [fallback].
+  static UtilityTariffs fromJson(Object? j, {UtilityTariffs fallback = initial}) {
+    if (j is! Map) return fallback;
+    return UtilityTariffs(
+      waterSubIn: _dn(j['waterSubIn']) ?? fallback.waterSubIn,
+      waterSubOut: _dn(j['waterSubOut']) ?? fallback.waterSubOut,
+      cubeIn: _dn(j['cubeIn']) ?? fallback.cubeIn,
+      cubeOut: _dn(j['cubeOut']) ?? fallback.cubeOut,
+      kwh: _dn(j['kwh']) ?? fallback.kwh,
+      housing: _dn(j['housing']) ?? fallback.housing,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'waterSubIn': waterSubIn,
+        'waterSubOut': waterSubOut,
+        'cubeIn': cubeIn,
+        'cubeOut': cubeOut,
+        'kwh': kwh,
+        'housing': housing,
+      };
+}
+
+/// Настройки коммуналки: текущие тарифы и сумма по умолчанию.
+class UtilityConfig {
+  const UtilityConfig({this.tariffs = UtilityTariffs.initial, this.plan});
+
+  static const id = 'utilities-config';
+
+  /// Тарифы для новых показаний.
+  final UtilityTariffs tariffs;
+
+  /// Сумма коммуналки по умолчанию — пока не внесены показания за период.
+  /// null — ещё не задана (тогда берётся сумма, записанная в самом периоде).
+  final double? plan;
+
+  UtilityConfig copyWith({UtilityTariffs? tariffs, double? plan}) =>
+      UtilityConfig(tariffs: tariffs ?? this.tariffs, plan: plan ?? this.plan);
+
+  static UtilityConfig fromRecord(SyncRecord? r) {
+    if (r == null || r.deleted) return const UtilityConfig();
+    return UtilityConfig(
+      tariffs: UtilityTariffs.fromJson(r.data['tariffs']),
+      plan: _dn(r.data['plan']),
+    );
+  }
+
+  Map<String, dynamic> toData() => {
+        'tariffs': tariffs.toJson(),
+        if (plan != null) 'plan': plan,
+      };
+}
+
+/// Показания счётчиков за месяц (снимаются 28-го).
+///
+/// Одна запись на месяц: id вида `meter-2026-10`, поэтому показания за один
+/// месяц, введённые на двух устройствах, не задваиваются.
+class MeterReading {
+  MeterReading({
+    required this.date,
+    required this.bath,
+    required this.kitchen,
+    required this.el,
+    this.heating = 0,
+    this.tariffs = UtilityTariffs.initial,
+  });
+
+  /// Дата снятия показаний.
+  final DateTime date;
+
+  /// Счётчик воды в ванной, м³.
+  final double bath;
+
+  /// Счётчик воды на кухне, м³.
+  final double kitchen;
+
+  /// Электросчётчик, кВт·ч.
+  final double el;
+
+  /// Отопление за месяц, ₴ (вводится вручную, 0 — не было).
+  final double heating;
+
+  /// Тарифы, действовавшие на момент показаний. Смена тарифов в настройках
+  /// не пересчитывает старые месяцы.
+  final UtilityTariffs tariffs;
+
+  String get id => idFor(date);
+
+  static String idFor(DateTime date) =>
+      'meter-${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}';
+
+  MeterReading copyWith({
+    DateTime? date,
+    double? bath,
+    double? kitchen,
+    double? el,
+    double? heating,
+    UtilityTariffs? tariffs,
+  }) =>
+      MeterReading(
+        date: date ?? this.date,
+        bath: bath ?? this.bath,
+        kitchen: kitchen ?? this.kitchen,
+        el: el ?? this.el,
+        heating: heating ?? this.heating,
+        tariffs: tariffs ?? this.tariffs,
+      );
+
+  static MeterReading? fromRecord(SyncRecord r) {
+    final date = tryParseDateKey(r.data['date']);
+    if (date == null) return null;
+    return MeterReading(
+      date: date,
+      bath: _d(r.data['bath']),
+      kitchen: _d(r.data['kitchen']),
+      el: _d(r.data['el']),
+      heating: _d(r.data['heating']),
+      tariffs: UtilityTariffs.fromJson(r.data['tariffs']),
+    );
+  }
+
+  Map<String, dynamic> toData() => {
+        'date': dateKey(date),
+        'bath': bath,
+        'kitchen': kitchen,
+        'el': el,
+        'heating': heating,
+        'tariffs': tariffs.toJson(),
       };
 }

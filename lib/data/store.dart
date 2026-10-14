@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../logic/credits.dart';
+import '../logic/utilities.dart';
 import '../util/format.dart';
 import 'hlc.dart';
 import 'models.dart';
@@ -439,13 +440,174 @@ class Store extends ChangeNotifier {
     return past ?? all.first;
   }
 
+  /// Обязательные расходы периода. Сумма коммуналки уже подставлена:
+  /// по показаниям счётчиков, а если их ещё нет — план по умолчанию.
   List<FixedExpense> fixedOf(String periodId) {
+    final raw = _fixedRaw(periodId);
+    if (!raw.any((f) => f.isUtilities)) return raw;
+    final p = periodById(periodId);
+    return [
+      for (final f in raw)
+        if (f.isUtilities && p != null) _resolveUtilities(f, p) else f,
+    ];
+  }
+
+  /// Обязательные расходы как они записаны (без подстановки коммуналки).
+  List<FixedExpense> _fixedRaw(String periodId) {
     final list = _live(RecType.fixed)
         .map(FixedExpense.fromRecord)
         .where((f) => f.periodId == periodId)
         .toList()
       ..sort((a, b) => a.order != b.order ? a.order.compareTo(b.order) : a.name.compareTo(b.name));
     return list;
+  }
+
+  FixedExpense _resolveUtilities(FixedExpense f, Period p) {
+    final s = _utilityStatus(p, f);
+    return f.resolved(amount: s.amount, isActual: s.isActual, readingDate: s.bill?.reading.date);
+  }
+
+  // ------------------------------------------------------------ коммуналка
+
+  UtilityConfig get utilityConfig => UtilityConfig.fromRecord(_records[UtilityConfig.id]);
+
+  void saveUtilityConfig(UtilityConfig c) => put(RecType.utilConfig, UtilityConfig.id, c.toData());
+
+  /// Все показания, по возрастанию даты.
+  List<MeterReading> get meterReadings {
+    final list = _live(RecType.meter).map(MeterReading.fromRecord).whereType<MeterReading>().toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+    return list;
+  }
+
+  MeterReading? readingById(String id) {
+    final r = _records[id];
+    if (r == null || r.deleted || r.type != RecType.meter) return null;
+    return MeterReading.fromRecord(r);
+  }
+
+  /// Предыдущие показания (последние до даты [date]).
+  MeterReading? readingBefore(DateTime date) {
+    MeterReading? prev;
+    for (final m in meterReadings) {
+      if (!m.date.isBefore(date)) break;
+      prev = m;
+    }
+    return prev;
+  }
+
+  /// Счёт за месяц; null — для самых первых показаний (не с чем сравнить).
+  UtilityBill? billFor(MeterReading m) {
+    final prev = readingBefore(m.date);
+    return prev == null ? null : UtilityBill.of(m, prev);
+  }
+
+  /// Строка коммуналки в периоде (если есть).
+  FixedExpense? utilitiesItemOf(String periodId) {
+    for (final f in fixedOf(periodId)) {
+      if (f.isUtilities) return f;
+    }
+    return null;
+  }
+
+  /// Коммуналка в периоде: показания, снятые внутри периода (28-го),
+  /// а пока их нет — сумма по умолчанию.
+  UtilityStatus utilityStatus(Period p) {
+    FixedExpense? item;
+    for (final f in _fixedRaw(p.id)) {
+      if (f.isUtilities) {
+        item = f;
+        break;
+      }
+    }
+    return _utilityStatus(p, item);
+  }
+
+  UtilityStatus _utilityStatus(Period p, FixedExpense? item) {
+    final plan = utilityConfig.plan ?? item?.amount ?? 0;
+    MeterReading? reading;
+    for (final m in meterReadings) {
+      if (p.contains(m.date)) reading = m;
+    }
+    final bill = reading == null ? null : billFor(reading);
+    return UtilityStatus(
+      amount: bill?.total ?? plan,
+      plan: plan,
+      dueDate: meterDateIn(p),
+      bill: bill,
+      reading: reading,
+    );
+  }
+
+  /// Сохраняет показания. [previousId] — id записи до правки: если дату
+  /// перенесли в другой месяц, старая запись удаляется.
+  void saveReading(MeterReading m, {String? previousId}) {
+    batch(() {
+      if (previousId != null && previousId != m.id) {
+        final old = _records[previousId];
+        if (old != null && !old.deleted) _putQuiet(old.type, old.id, old.data, deleted: true);
+      }
+      _putQuiet(RecType.meter, m.id, m.toData());
+    });
+  }
+
+  /// Подключает коммуналку периода к показаниям: переделывает строку
+  /// «Коммуналка» или добавляет новую.
+  void attachUtilities(Period p) {
+    final raw = _fixedRaw(p.id);
+    for (final f in raw) {
+      if (f.name.toLowerCase().contains('коммунал')) {
+        saveFixed(FixedExpense(
+          id: f.id,
+          periodId: f.periodId,
+          name: f.name,
+          amount: f.amount,
+          order: f.order,
+          kind: FixedKind.utilities,
+        ));
+        return;
+      }
+    }
+    saveFixed(FixedExpense(
+      id: newId(),
+      periodId: p.id,
+      name: 'Коммуналка',
+      amount: utilityConfig.plan ?? 0,
+      order: raw.isEmpty ? 0 : raw.map((f) => f.order).reduce(max) + 1,
+      kind: FixedKind.utilities,
+    ));
+  }
+
+  /// Показания из таблицы за 2026 год. Декабрь 2025 — только как база для
+  /// расчёта января. Id по месяцам, поэтому повторная загрузка (в т.ч. на
+  /// втором устройстве) не создаёт дублей.
+  void importMeterHistory() {
+    const rows = [
+      // год, месяц, ванна, кухня, эл, отопление
+      (2025, 12, 665.0, 78.0, 26381.0, 0.0),
+      (2026, 1, 666.0, 78.0, 26820.0, 2540.0),
+      (2026, 2, 668.0, 79.0, 27075.0, 2500.0),
+      (2026, 3, 670.0, 79.0, 27321.0, 1200.0),
+      (2026, 4, 673.0, 80.0, 27724.0, 0.0),
+      (2026, 5, 675.0, 81.0, 28116.0, 0.0),
+      (2026, 6, 677.0, 81.0, 28383.0, 0.0),
+      (2026, 7, 680.0, 81.0, 28623.0, 0.0),
+      (2026, 8, 683.0, 82.0, 28894.0, 0.0),
+      (2026, 9, 685.0, 82.0, 29154.0, 0.0),
+    ];
+    batch(() {
+      for (final (y, mo, bath, kitchen, el, heating) in rows) {
+        final m = MeterReading(
+          date: DateTime(y, mo, meterDay),
+          bath: bath,
+          kitchen: kitchen,
+          el: el,
+          heating: heating,
+          tariffs: UtilityTariffs.initial,
+        );
+        _putQuiet(RecType.meter, m.id, m.toData());
+      }
+    });
   }
 
   List<CreditItem> creditsOf(String periodId) {
@@ -604,8 +766,17 @@ class Store extends ChangeNotifier {
       _putQuiet(RecType.period, p.id, p.toData());
       _putQuiet(RecType.fixed, '${p.id}-fx-0',
           FixedExpense(id: '${p.id}-fx-0', periodId: p.id, name: 'Квартира', amount: 10000, order: 0).toData());
-      _putQuiet(RecType.fixed, '${p.id}-fx-1',
-          FixedExpense(id: '${p.id}-fx-1', periodId: p.id, name: 'Коммуналка', amount: 4000, order: 1).toData());
+      _putQuiet(
+          RecType.fixed,
+          '${p.id}-fx-1',
+          FixedExpense(
+            id: '${p.id}-fx-1',
+            periodId: p.id,
+            name: 'Коммуналка',
+            amount: utilityConfig.plan ?? 4000,
+            order: 1,
+            kind: FixedKind.utilities,
+          ).toData());
     });
     return p;
   }
@@ -626,10 +797,19 @@ class Store extends ChangeNotifier {
     batch(() {
       _putQuiet(RecType.period, p.id, p.toData());
       var i = 0;
-      for (final f in fixedOf(prev.id)) {
+      for (final f in _fixedRaw(prev.id)) {
         final id = '${p.id}-fx-$i';
-        _putQuiet(RecType.fixed, id,
-            FixedExpense(id: id, periodId: p.id, name: f.name, amount: f.amount, order: i).toData());
+        _putQuiet(
+            RecType.fixed,
+            id,
+            FixedExpense(
+              id: id,
+              periodId: p.id,
+              name: f.name,
+              amount: f.isUtilities ? (utilityConfig.plan ?? f.amount) : f.amount,
+              order: i,
+              kind: f.isUtilities ? FixedKind.utilities : f.kind,
+            ).toData());
         i++;
       }
       i = 0;
@@ -644,7 +824,8 @@ class Store extends ChangeNotifier {
     return p;
   }
 
-  /// Данные из исходной таблицы (период 10.10.2026 – 09.11.2026).
+  /// Данные из исходной таблицы (период 10.10.2026 – 09.11.2026)
+  /// и показания счётчиков за 2026 год.
   /// Id фиксированные, поэтому загрузка на двух устройствах не создаст дублей.
   Period loadSample() {
     final start = DateTime(2026, 10, 10);
@@ -658,11 +839,17 @@ class Store extends ChangeNotifier {
     );
     batch(() {
       _putQuiet(RecType.period, p.id, p.toData());
-      final fixed = [('Квартира', 10000.0), ('Коммуналка', 4000.0)];
+      final fixed = [
+        ('Квартира', 10000.0, FixedKind.manual),
+        ('Коммуналка', 4000.0, FixedKind.utilities),
+      ];
       for (var i = 0; i < fixed.length; i++) {
         final id = '${p.id}-fx-$i';
-        _putQuiet(RecType.fixed, id,
-            FixedExpense(id: id, periodId: p.id, name: fixed[i].$1, amount: fixed[i].$2, order: i).toData());
+        _putQuiet(
+            RecType.fixed,
+            id,
+            FixedExpense(id: id, periodId: p.id, name: fixed[i].$1, amount: fixed[i].$2, order: i, kind: fixed[i].$3)
+                .toData());
       }
       final credits = [('Кредит 1', 1850.0), ('Кредит 2', 666.0), ('Кредит 3', 640.0), ('Проценты', 700.0)];
       for (var i = 0; i < credits.length; i++) {
@@ -678,6 +865,7 @@ class Store extends ChangeNotifier {
         _putQuiet(RecType.expense, id,
             Expense(id: id, date: DateTime(2026, 10, day), amount: amount, created: day).toData());
       }
+      importMeterHistory();
     });
     return p;
   }

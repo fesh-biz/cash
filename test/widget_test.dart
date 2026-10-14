@@ -19,10 +19,16 @@ void main() {
     expect(find.text('Потрачено'), findsWidgets);
 
     // Переход по вкладкам не падает.
-    for (final tab in ['Кредиты', 'Период', 'Синхронизация', 'Бюджет']) {
-      await tester.tap(find.text(tab).last);
+    for (final tab in ['Кредиты', 'Период', 'Коммуналка', 'Синхронизация', 'Бюджет']) {
+      await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text(tab)));
       await tester.pumpAndSettle();
     }
+
+    // Вкладка «Коммуналка»: показания из таблицы на месте.
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Коммуналка')));
+    await tester.pumpAndSettle();
+    expect(store.meterReadings.length, 10);
+    expect(find.text('Сумма по умолчанию'), findsOneWidget);
     expect(find.byType(Scaffold), findsWidgets);
 
     // Сбрасываем таймер отложенного сохранения.

@@ -6,6 +6,7 @@ import '../util/format.dart';
 import 'app_scope.dart';
 import 'common.dart';
 import 'expense_editor.dart';
+import 'reading_editor.dart';
 
 /// Вкладка «Бюджет»: главное число дня, сводка и таблица по дням.
 class OverviewPage extends StatefulWidget {
@@ -72,6 +73,10 @@ class _OverviewPageState extends State<OverviewPage> {
             },
     );
     final stats = _Stats(summary: summary, onOpenTab: widget.onOpenTab);
+    final util = store.utilitiesItemOf(period.id) == null ? null : store.utilityStatus(period);
+    final reminder = (util != null && summary.state == PeriodState.active && util.isDue(DateTime.now()))
+        ? _UtilityReminder(plan: util.plan, onOpen: () => widget.onOpenTab(3))
+        : null;
 
     if (isWide(context)) {
       _scrollToToday(summary);
@@ -85,6 +90,7 @@ class _OverviewPageState extends State<OverviewPage> {
               padding: const EdgeInsets.fromLTRB(16, 16, 8, 96),
               children: [
                 hero,
+                if (reminder != null) ...[const SizedBox(height: 12), reminder],
                 const SizedBox(height: 12),
                 stats,
                 if (summary.state == PeriodState.active) ...[
@@ -139,6 +145,7 @@ class _OverviewPageState extends State<OverviewPage> {
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
       children: [
         hero,
+        if (reminder != null) ...[const SizedBox(height: 12), reminder],
         const SizedBox(height: 12),
         stats,
         const SizedBox(height: 12),
@@ -274,7 +281,11 @@ class _Stats extends StatelessWidget {
     final s = summary;
     final p = s.period;
     final store = AppScope.of(context).store;
-    final fixedNames = store.fixedOf(p.id).map((f) => f.name).where((n) => n.isNotEmpty).join(', ');
+    final fixedNames = store
+        .fixedOf(p.id)
+        .where((f) => f.name.isNotEmpty)
+        .map((f) => f.isUtilities && !f.isActual ? '${f.name} (план)' : f.name)
+        .join(', ');
     final deposited = store.depositsOf(p.id).fold<double>(0, (sum, d) => sum + d.amount);
     final creditLeft = p.creditPlan - deposited;
     return StatGrid(
@@ -312,6 +323,67 @@ class _Stats extends StatelessWidget {
           color: balanceColor(context, s.left),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------- напоминание
+
+/// 28-е наступило, а показаний за период ещё нет.
+class _UtilityReminder extends StatelessWidget {
+  const _UtilityReminder({required this.plan, required this.onOpen});
+
+  final double plan;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final fg = t.colorScheme.onTertiaryContainer;
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: t.colorScheme.tertiaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.speed, color: fg),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('Пора снять показания счётчиков',
+                      style: t.textTheme.titleSmall?.copyWith(color: fg, fontWeight: FontWeight.w600)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Сейчас коммуналка в бюджете — план ${money(plan)}. '
+              'После ввода показаний подставится точная сумма.',
+              style: t.textTheme.bodyMedium?.copyWith(color: fg),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton(
+                  onPressed: () => showReadingEditor(context, date: today()),
+                  child: const Text('Внести показания'),
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(foregroundColor: fg),
+                  onPressed: onOpen,
+                  child: const Text('Коммуналка'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -488,7 +560,7 @@ class _Welcome extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 'Период 10.10–09.11.2026: курс 51, 740 €, квартира, коммуналка, '
-                'кредиты и расходы за 10–13 октября.',
+                'кредиты, расходы за 10–13 октября и показания счётчиков за 2026 год.',
                 style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
                 textAlign: TextAlign.center,
               ),
@@ -506,7 +578,7 @@ class _Welcome extends StatelessWidget {
               OutlinedButton.icon(
                 icon: const Icon(Icons.sync),
                 label: const Text('Получить данные с другого устройства'),
-                onPressed: () => onOpenTab(3),
+                onPressed: () => onOpenTab(4),
               ),
             ],
           ),

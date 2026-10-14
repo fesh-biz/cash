@@ -3,16 +3,22 @@ import 'package:flutter/material.dart';
 import '../data/models.dart';
 import '../data/store.dart';
 import '../logic/budget.dart';
+import '../logic/utilities.dart';
 import '../util/format.dart';
 import 'app_scope.dart';
 import 'common.dart';
+import 'reading_editor.dart';
+import 'utilities_page.dart';
 
 /// Вкладка «Период»: даты, доход и курс, обязательные расходы, история периодов.
 class PeriodPage extends StatelessWidget {
-  const PeriodPage({super.key, required this.period, required this.onSelectPeriod});
+  const PeriodPage({super.key, required this.period, required this.onSelectPeriod, this.onOpenUtilities});
 
   final Period? period;
   final ValueChanged<String?> onSelectPeriod;
+
+  /// Открыть вкладку «Коммуналка».
+  final VoidCallback? onOpenUtilities;
 
   @override
   Widget build(BuildContext context) {
@@ -84,11 +90,23 @@ class PeriodPage extends StatelessWidget {
       children: [
         if (fixed.isEmpty) const ListTile(title: Text('Нет обязательных расходов')),
         for (final f in fixed)
-          AmountTile(
-            title: f.name.isEmpty ? 'Без названия' : f.name,
-            amount: f.amount,
-            onTap: () => _editFixed(context, store, p, f, f.order),
-          ),
+          if (f.isUtilities)
+            AmountTile(
+              title: f.name.isEmpty ? 'Коммуналка' : f.name,
+              amount: f.amount,
+              subtitle: f.isActual && f.readingDate != null
+                  ? 'по показаниям ${fmtDate(f.readingDate!)}'
+                  : 'план · уточнится по показаниям${_dueSuffix(p)}',
+              leading: Icon(f.isActual ? Icons.check_circle_outline : Icons.schedule,
+                  color: f.isActual ? positiveColor(context) : t.colorScheme.onSurfaceVariant),
+              onTap: () => _utilitiesActions(context, store, p, f),
+            )
+          else
+            AmountTile(
+              title: f.name.isEmpty ? 'Без названия' : f.name,
+              amount: f.amount,
+              onTap: () => _editFixed(context, store, p, f, f.order),
+            ),
         AmountTile(
           title: 'Кредиты (плачу)',
           amount: p.creditPlan,
@@ -241,13 +259,95 @@ class PeriodPage extends StatelessWidget {
       if (context.mounted) showSnack(context, 'Удалено', undo: () => store.restore(id));
       return;
     }
+    final kind = f != null
+        ? (f.kind.isEmpty ? FixedKind.manual : f.kind)
+        : (r.name.toLowerCase().contains('коммунал') ? FixedKind.utilities : FixedKind.manual);
     store.saveFixed(FixedExpense(
       id: f?.id ?? Store.newId(),
       periodId: p.id,
       name: r.name,
       amount: r.amount,
       order: order,
+      kind: kind,
     ));
+  }
+
+  static String _dueSuffix(Period p) {
+    final d = meterDateIn(p);
+    return d == null ? '' : ' ${fmtDateShort(d)}';
+  }
+
+  /// Коммуналка считается сама — вместо ввода суммы предлагаем действия.
+  Future<void> _utilitiesActions(BuildContext context, Store store, Period p, FixedExpense f) async {
+    final s = store.utilityStatus(p);
+    final action = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(f.name.isEmpty ? 'Коммуналка' : f.name),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+            child: Text(s.isActual
+                ? 'Сумма посчитана по показаниям счётчиков: ${moneyCents(s.amount)}.'
+                : 'Пока показаний за период нет, в бюджете стоит сумма по умолчанию: ${money(s.plan)}.'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'reading'),
+            child: ListTile(
+              leading: const Icon(Icons.speed),
+              title: Text(s.reading == null ? 'Внести показания' : 'Изменить показания'),
+            ),
+          ),
+          if (!s.isActual)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, 'plan'),
+              child: const ListTile(leading: Icon(Icons.edit_outlined), title: Text('Изменить сумму по умолчанию')),
+            ),
+          if (onOpenUtilities != null)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, 'open'),
+              child: const ListTile(leading: Icon(Icons.water_drop_outlined), title: Text('Открыть «Коммуналка»')),
+            ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'manual'),
+            child: const ListTile(
+              leading: Icon(Icons.link_off),
+              title: Text('Вводить вручную'),
+              subtitle: Text('Отключить от показаний в этом периоде'),
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'delete'),
+            child: ListTile(
+              leading: Icon(Icons.delete_outline, color: Theme.of(ctx).colorScheme.error),
+              title: const Text('Удалить строку'),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (action == null || !context.mounted) return;
+    switch (action) {
+      case 'reading':
+        await showReadingEditor(context, existing: s.reading, date: meterDateIn(p) ?? today());
+      case 'plan':
+        await editUtilityPlan(context);
+      case 'open':
+        onOpenUtilities?.call();
+      case 'manual':
+        store.saveFixed(FixedExpense(
+          id: f.id,
+          periodId: f.periodId,
+          name: f.name,
+          amount: f.amount,
+          order: f.order,
+          kind: FixedKind.manual,
+        ));
+        showSnack(context, 'Коммуналка в этом периоде теперь вводится вручную');
+      case 'delete':
+        store.remove(f.id);
+        showSnack(context, 'Удалено', undo: () => store.restore(f.id));
+    }
   }
 }
 

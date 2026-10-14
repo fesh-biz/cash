@@ -38,6 +38,15 @@ String money(num value, {bool currency = true, bool plusSign = false}) {
   return currency ? '$out$_nbsp₴' : out;
 }
 
+/// С копейками: 2064.28 -> "2 064,28 ₴" (как в таблице коммуналки).
+String moneyCents(num value, {bool currency = true}) {
+  final cents = (value * 100).round();
+  final abs = cents.abs();
+  var out = '${_groupDigits((abs ~/ 100).toString())},${_two(abs % 100)}';
+  if (cents < 0) out = '−$out';
+  return currency ? '$out$_nbsp₴' : out;
+}
+
 /// Число без лишних нулей: 51 -> "51", 41.5 -> "41.5", 41.25 -> "41.25".
 String numStr(num value) {
   if (value == value.roundToDouble()) {
