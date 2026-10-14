@@ -232,11 +232,11 @@ class _PeerTile extends StatelessWidget {
     final p = peer;
     final lines = <String>['${p.host}:${p.port} · ${p.online ? 'в сети' : 'не в сети'}'];
     if (p.lastSync != null) lines.add('Синхронизировано: ${fmtTimeAgo(p.lastSync!)}');
-    if (p.error != null) lines.add(p.error!);
+    if (p.error != null && (p.hasProblem || !p.networkError)) lines.add(p.error!);
     return ListTile(
       leading: Icon(
         Icons.devices_other,
-        color: p.error != null
+        color: p.hasProblem
             ? t.colorScheme.error
             : p.online
                 ? t.colorScheme.primary

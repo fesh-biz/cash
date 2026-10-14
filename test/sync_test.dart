@@ -57,6 +57,32 @@ void main() {
     expect(a.expensesOn(e.date), isEmpty);
   });
 
+  test('выключенное устройство — не ошибка, пока оно не в сети', () async {
+    expect(await sa.addManual('127.0.0.1:${sb.port}'), isNull);
+    final peer = sa.peers.values.single;
+    await sb.stop();
+    peer.lastSeen = DateTime.now().subtract(const Duration(minutes: 5));
+    await sa.syncWith(peer, force: true);
+    expect(peer.error, isNotNull);
+    expect(peer.networkError, isTrue);
+    expect(sa.hasErrors, isFalse);
+    // А если устройство в сети, но связаться не выходит — это уже проблема.
+    peer.lastSeen = DateTime.now();
+    expect(sa.hasErrors, isTrue);
+  });
+
+  test('входящий обмен снимает старую ошибку', () async {
+    expect(await sa.addManual('127.0.0.1:${sb.port}'), isNull);
+    final aOnB = sb.peers['aaaa']!;
+    aOnB
+      ..error = 'Нет связи'
+      ..networkError = false;
+    expect(sb.hasErrors, isTrue);
+    await sa.syncWith(sa.peers.values.single, force: true);
+    expect(aOnB.error, isNull);
+    expect(sb.hasErrors, isFalse);
+  });
+
   test('чужой код синхронизации не пускает', () async {
     b.settings.syncKey = 'other-key';
     b.addExpense(today(), 100, '');

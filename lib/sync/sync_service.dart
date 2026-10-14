@@ -32,15 +32,37 @@ class Peer {
   DateTime? lastSeen;
   DateTime? lastSync;
   String? error;
+
+  /// Ошибка — просто нет связи (устройство выключено, приложение свёрнуто).
+  bool networkError = false;
   bool busy = false;
   DateTime? _retryAfter;
 
+  /// Во время обмена пришёл запрос на ещё один — повторить после.
+  bool _again = false;
+
   bool get online => lastSeen != null && DateTime.now().difference(lastSeen!) < const Duration(seconds: 30);
+
+  /// Настоящая проблема, о которой стоит предупредить. Недоступность
+  /// выключенного или свёрнутого устройства проблемой не считается —
+  /// только если оно в сети (присылает о себе сигналы), а связаться не выходит.
+  bool get hasProblem => error != null && (!networkError || online);
+
+  void _ok(DateTime now) {
+    lastSync = now;
+    lastSeen = now;
+    error = null;
+    networkError = false;
+    _retryAfter = null;
+  }
 }
 
 class SyncException implements Exception {
-  SyncException(this.message);
+  SyncException(this.message, {this.network = false});
   final String message;
+
+  /// Нет связи (а не ошибка кода, часов и т.п.).
+  final bool network;
   @override
   String toString() => message;
 }
@@ -80,6 +102,7 @@ class SyncService extends ChangeNotifier {
   Timer? _debounce;
   StreamSubscription<void>? _changesSub;
   bool _syncingAll = false;
+  bool _syncAgain = false;
   bool _started = false;
 
   int? port;
@@ -95,7 +118,7 @@ class SyncService extends ChangeNotifier {
 
   bool get hasKey => store.settings.syncKey.isNotEmpty;
 
-  bool get hasErrors => peers.values.any((p) => p.error != null);
+  bool get hasErrors => peers.values.any((p) => p.hasProblem);
 
   Future<void> start() async {
     if (_started) return;
@@ -113,7 +136,12 @@ class SyncService extends ChangeNotifier {
     _changesSub = store.localChanges.listen((_) {
       if (!store.settings.autoSync) return;
       _debounce?.cancel();
-      _debounce = Timer(const Duration(milliseconds: 1500), () => syncAll());
+      _debounce = Timer(const Duration(milliseconds: 600), () {
+        // Сообщаем другим устройствам, что есть новое, — они заберут сами,
+        // даже если до них отсюда не достучаться.
+        _announce();
+        unawaited(syncAll());
+      });
     });
     _syncTimer = Timer.periodic(const Duration(seconds: 20), (_) {
       if (store.settings.autoSync) syncAll();
@@ -224,6 +252,7 @@ class SyncService extends ChangeNotifier {
       'id': store.deviceId,
       'name': store.settings.deviceName,
       'port': myPort,
+      'seq': store.seq,
     }));
     for (final t in _broadcastTargets) {
       try {
@@ -239,11 +268,17 @@ class SyncService extends ChangeNotifier {
       final id = j['id'];
       final p = j['port'];
       if (id is! String || id == store.deviceId || p is! num) return;
-      final isNew = !peers.containsKey(id);
-      _touchPeer(id, j['name'] is String ? j['name'] as String : id, d.address.address, p.toInt());
-      if (isNew && store.settings.autoSync && hasKey) {
-        unawaited(syncWith(peers[id]!));
-      }
+      final existing = peers[id];
+      final wasOnline = existing?.online ?? false;
+      final peer = _touchPeer(id, j['name'] is String ? j['name'] as String : id, d.address.address, p.toInt());
+      if (!store.settings.autoSync || !hasKey) return;
+      // У того устройства есть изменения, которых мы ещё не забирали, —
+      // забираем сразу, не дожидаясь планового обмена.
+      final remoteSeq = j['seq'] is num ? (j['seq'] as num).toInt() : null;
+      final behind = remoteSeq != null && remoteSeq > store.settings.cursorFor(id).pull;
+      // Устройство снова в сети после обрыва связи — не ждём паузы между попытками.
+      final cameBack = !wasOnline && peer.networkError;
+      if (existing == null || behind || cameBack) unawaited(syncWith(peer, force: cameBack));
     } catch (_) {}
   }
 
@@ -322,7 +357,16 @@ class SyncService extends ChangeNotifier {
       final host = req.connectionInfo?.remoteAddress.address;
       final peerPort = int.tryParse(req.headers.value('x-cash-port') ?? '');
       final peerName = Uri.decodeComponent(req.headers.value('x-cash-name') ?? peerId);
-      if (host != null && peerPort != null) _touchPeer(peerId, peerName, host, peerPort);
+      if (host != null && peerPort != null) {
+        final peer = _touchPeer(peerId, peerName, host, peerPort);
+        // То устройство само достучалось до нас с верным кодом — связь есть,
+        // и обмен идёт (оно забирает наши изменения и отдаёт свои).
+        final now = DateTime.now();
+        peer._ok(now);
+        store.settings.knownPeers[peerId]?.lastSync = now.millisecondsSinceEpoch;
+        store.saveSettings(notify: false);
+        notifyListeners();
+      }
 
       if (req.method == 'GET' && path == '/cash/changes') {
         final since = int.tryParse(req.uri.queryParameters['since'] ?? '0') ?? 0;
@@ -425,9 +469,9 @@ class SyncService extends ChangeNotifier {
       }
       return json;
     } on SocketException catch (_) {
-      throw SyncException('Нет связи с ${p.host}:${p.port}');
+      throw SyncException('Нет связи с ${p.host}:${p.port}', network: true);
     } on TimeoutException catch (_) {
-      throw SyncException('${p.host}:${p.port} не отвечает');
+      throw SyncException('${p.host}:${p.port} не отвечает', network: true);
     } on HttpException catch (e) {
       throw SyncException('Ошибка связи: ${e.message}');
     } finally {
@@ -465,15 +509,22 @@ class SyncService extends ChangeNotifier {
     }
   }
 
-  /// Синхронизироваться со всеми известными устройствами.
+  /// Синхронизироваться со всеми известными устройствами (параллельно,
+  /// чтобы недоступное устройство не задерживало остальные).
+  /// Если обмен уже идёт — повторится сразу после него, правка не потеряется.
   Future<void> syncAll({bool force = false}) async {
-    if (_syncingAll || !hasKey) return;
+    if (!hasKey) return;
+    if (_syncingAll) {
+      _syncAgain = true;
+      return;
+    }
     _syncingAll = true;
     notifyListeners();
     try {
-      for (final p in peers.values.toList()) {
-        await syncWith(p, force: force);
-      }
+      do {
+        _syncAgain = false;
+        await Future.wait([for (final p in peers.values.toList()) syncWith(p, force: force)]);
+      } while (_syncAgain);
       lastSyncAll = DateTime.now();
     } finally {
       _syncingAll = false;
@@ -484,7 +535,11 @@ class SyncService extends ChangeNotifier {
   /// Двусторонняя синхронизация с одним устройством: забрать его изменения,
   /// затем отправить свои.
   Future<void> syncWith(Peer p, {bool force = false}) async {
-    if (p.busy) return;
+    if (p.busy) {
+      // Идёт обмен с этим устройством — повторим сразу после него.
+      p._again = true;
+      return;
+    }
     if (!force && p._retryAfter != null && DateTime.now().isBefore(p._retryAfter!)) return;
     if (!hasKey) {
       p.error = 'Задайте код синхронизации';
@@ -524,20 +579,23 @@ class SyncService extends ChangeNotifier {
       cur.push = upTo;
 
       final now = DateTime.now();
-      p
-        ..lastSync = now
-        ..lastSeen = now
-        ..error = null
-        .._retryAfter = null;
+      p._ok(now);
       store.settings.knownPeers[p.id]?.lastSync = now.millisecondsSinceEpoch;
       store.saveSettings(notify: false);
     } catch (e) {
       p.error = e is SyncException ? e.message : '$e';
-      // Недоступное устройство не дёргаем каждые 20 секунд.
-      p._retryAfter = DateTime.now().add(const Duration(minutes: 1));
+      p.networkError = e is SyncException && e.network;
+      // Недоступное устройство не дёргаем каждые 20 секунд. Если оно при этом
+      // в сети (присылает о себе сигналы), пробуем почаще.
+      final pause = p.networkError && p.online ? const Duration(seconds: 15) : const Duration(minutes: 1);
+      p._retryAfter = DateTime.now().add(pause);
     } finally {
       p.busy = false;
       notifyListeners();
+      if (p._again) {
+        p._again = false;
+        unawaited(syncWith(p));
+      }
     }
   }
 }
