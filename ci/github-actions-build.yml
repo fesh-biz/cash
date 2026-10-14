@@ -1,0 +1,59 @@
+# Сборка в облаке GitHub (бесплатно для личных репозиториев):
+# загрузите проект в репозиторий на GitHub — после каждого push здесь
+# соберутся APK и Windows-версия (Actions → последний запуск → Artifacts).
+name: build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  test-and-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Prepare
+        shell: pwsh
+        run: ./scripts/prepare.ps1
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Test
+        run: flutter test
+      - name: Build APK
+        run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Cash-android
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Prepare
+        shell: pwsh
+        run: ./scripts/prepare.ps1
+      - name: Build Windows
+        run: flutter build windows --release
+      - name: Add VC++ runtime
+        shell: pwsh
+        run: |
+          foreach ($dll in 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll') {
+            Copy-Item "$env:WINDIR\System32\$dll" build\windows\x64\runner\Release\ -Force
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Cash-windows
+          path: build/windows/x64/runner/Release/
