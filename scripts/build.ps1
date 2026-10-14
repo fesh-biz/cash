@@ -54,7 +54,20 @@ if (-not $SkipWindows) {
     Invoke-Logged 'log-windows.txt' { flutter build windows --release --no-tree-shake-icons }
     if ($LASTEXITCODE -ne 0) { throw 'Сборка Windows не удалась (подробности: dist\log-windows.txt)' }
     $out = Join-Path $dist 'Cash-windows'
-    if (Test-Path $out) { Remove-Item -Recurse -Force $out }
+    if (Test-Path $out) {
+        # Если программа запущена из dist\Cash-windows, папку не переименовать —
+        # тогда её не трогаем, а новую версию кладём рядом.
+        $old = Join-Path $dist 'Cash-windows-old'
+        if (Test-Path $old) { Remove-Item -Recurse -Force $old -ErrorAction SilentlyContinue }
+        try {
+            Rename-Item -Path $out -NewName 'Cash-windows-old' -ErrorAction Stop
+            Remove-Item -Recurse -Force $old -ErrorAction SilentlyContinue
+        } catch {
+            $out = Join-Path $dist 'Cash-windows-new'
+            Write-Host "    dist\Cash-windows занята (программа открыта) — новая версия в $out"
+            if (Test-Path $out) { Remove-Item -Recurse -Force $out }
+        }
+    }
     Copy-Item -Recurse -Path (Join-Path $root 'build\windows\x64\runner\Release') -Destination $out
     # Библиотеки Visual C++, чтобы программа запускалась на любом Windows 10
     foreach ($dll in 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll') {
