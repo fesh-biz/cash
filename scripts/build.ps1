@@ -44,7 +44,14 @@ if (-not $SkipTests) {
 
 if (-not $SkipWindows) {
     Write-Host '==> flutter build windows'
-    Invoke-Logged 'log-windows.txt' { flutter build windows --release }
+    # Flutter под Windows иногда не обновляет ресурсы (в т.ч. урезанный шрифт
+    # иконок) — новые иконки не видны. Удаляем старые копии, чтобы собрались заново.
+    foreach ($stale in 'build\flutter_assets', 'build\windows\x64\runner\Release\data\flutter_assets') {
+        $p = Join-Path $root $stale
+        if (Test-Path $p) { Remove-Item -Recurse -Force $p }
+    }
+    # Полный шрифт иконок (+1,5 МБ): иконки не пропадут, даже если кэш снова устареет.
+    Invoke-Logged 'log-windows.txt' { flutter build windows --release --no-tree-shake-icons }
     if ($LASTEXITCODE -ne 0) { throw 'Сборка Windows не удалась (подробности: dist\log-windows.txt)' }
     $out = Join-Path $dist 'Cash-windows'
     if (Test-Path $out) { Remove-Item -Recurse -Force $out }
