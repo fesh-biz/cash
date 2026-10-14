@@ -20,12 +20,14 @@ void main() {
 
     // Переход по вкладкам не падает.
     for (final tab in ['Кредиты', 'Период', 'Коммуналка', 'Синхронизация', 'Бюджет']) {
-      await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text(tab)));
+      await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.byTooltip(tab)));
       await tester.pumpAndSettle();
+      // Название вкладки — в заголовке страницы.
+      expect(find.descendant(of: find.byType(AppBar), matching: find.text(tab)), findsOneWidget);
     }
 
     // Вкладка «Коммуналка»: показания из таблицы на месте.
-    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Коммуналка')));
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.byTooltip('Коммуналка')));
     await tester.pumpAndSettle();
     expect(store.meterReadings.length, 10);
     expect(find.text('Сумма по умолчанию'), findsOneWidget);

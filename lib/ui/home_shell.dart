@@ -121,9 +121,13 @@ class _HomeShellState extends State<HomeShell> {
             appBar: appBar,
             floatingActionButton: fab,
             body: body,
+            // На телефоне внизу только иконки: подписи не помещаются,
+            // а название вкладки и так написано в заголовке страницы.
             bottomNavigationBar: NavigationBar(
               selectedIndex: _tab,
               onDestinationSelected: _goTab,
+              labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+              height: 64,
               destinations: [
                 for (var i = 0; i < _destinations.length; i++)
                   NavigationDestination(
