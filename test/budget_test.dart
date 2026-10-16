@@ -49,6 +49,7 @@ void main() {
     expect(s.state, PeriodState.active);
     expect(s.todayBalance.round(), -2477);
     expect(s.backToPlusDate, DateTime(2026, 10, 19));
+    expect(s.daysToPlus, 6);
     expect(s.daysLeft, 28);
     // (13740 − 2500 потрачено до 13-го) / 28 дней
     expect(s.perDayFromToday.round(), 401);

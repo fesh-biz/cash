@@ -150,13 +150,19 @@ class PeriodSummary {
   /// Если сегодня минус — с какого дня остаток станет неотрицательным,
   /// если больше ничего не тратить. null — если не в минусе или не успеет.
   DateTime? get backToPlusDate {
+    final k = daysToPlus;
+    return k == null ? null : addDays(period.start, todayIndex! + k);
+  }
+
+  /// Через сколько дней остаток станет неотрицательным, если больше ничего
+  /// не тратить. null — если не в минусе или не успеет до конца периода.
+  int? get daysToPlus {
     if (state != PeriodState.active) return null;
     final b = todayBalance;
     if (b >= 0 || perDay <= 0) return null;
     // Небольшой допуск, чтобы −0.0001 из-за округления не давал лишний день.
     final k = ((-b - 1e-6) / perDay).ceil();
-    final idx = todayIndex! + k;
-    if (idx >= period.days) return null;
-    return addDays(period.start, idx);
+    if (todayIndex! + k >= period.days) return null;
+    return k;
   }
 }

@@ -194,7 +194,8 @@ class _Hero extends StatelessWidget {
         }
         chips.add('В день: ${money(s.perDay)}');
         chips.add('С учётом трат: ${money(s.perDayFromToday)}/день');
-        chips.add('Осталось ${daysStr(s.daysLeft)}');
+        final toPlus = s.daysToPlus;
+        chips.add(toPlus != null ? 'В плюс через ${daysStr(toPlus)}' : 'Осталось ${daysStr(s.daysLeft)}');
         if (s.spentToday != 0) chips.add('Сегодня: ${money(s.spentToday)}');
       case PeriodState.notStarted:
         label = 'Период ещё не начался';
@@ -206,9 +207,9 @@ class _Hero extends StatelessWidget {
         sub = value.round() >= 0 ? 'Сэкономлено за период' : 'Перерасход за период';
     }
 
-    final negative = value.round() < 0;
-    final bg = negative ? t.colorScheme.errorContainer : t.colorScheme.primaryContainer;
-    final fg = negative ? t.colorScheme.onErrorContainer : t.colorScheme.onPrimaryContainer;
+    // Карточка всегда в основных (голубых) тонах приложения, и при перерасходе тоже.
+    final bg = t.colorScheme.primaryContainer;
+    final fg = t.colorScheme.onPrimaryContainer;
 
     return Card(
       margin: EdgeInsets.zero,
