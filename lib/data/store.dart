@@ -172,7 +172,7 @@ class Store extends ChangeNotifier {
           }
         }
       } catch (e) {
-        debugPrint('Не удалось прочитать ${candidate.path}: $e');
+        debugPrint('Не вдалося прочитати ${candidate.path}: $e');
       }
     }
 
@@ -215,11 +215,11 @@ class Store extends ChangeNotifier {
       try {
         return 'ПК ${Platform.localHostname}';
       } catch (_) {
-        return 'Компьютер';
+        return 'Комп’ютер';
       }
     }
     if (Platform.isAndroid || Platform.isIOS) return 'Телефон';
-    return 'Устройство';
+    return 'Пристрій';
   }
 
   // ---------------------------------------------------------------- запись
@@ -255,7 +255,7 @@ class Store extends ChangeNotifier {
         await _writeNow();
       } while (_savePending);
     } catch (e) {
-      debugPrint('Ошибка сохранения: $e');
+      debugPrint('Помилка збереження: $e');
     } finally {
       _saving = false;
     }
@@ -556,7 +556,7 @@ class Store extends ChangeNotifier {
   void attachUtilities(Period p) {
     final raw = _fixedRaw(p.id);
     for (final f in raw) {
-      if (f.name.toLowerCase().contains('коммунал')) {
+      if (isUtilitiesName(f.name)) {
         saveFixed(FixedExpense(
           id: f.id,
           periodId: f.periodId,
@@ -571,7 +571,7 @@ class Store extends ChangeNotifier {
     saveFixed(FixedExpense(
       id: newId(),
       periodId: p.id,
-      name: 'Коммуналка',
+      name: 'Комуналка',
       amount: utilityConfig.plan ?? 0,
       order: raw.isEmpty ? 0 : raw.map((f) => f.order).reduce(max) + 1,
       kind: FixedKind.utilities,
@@ -772,7 +772,7 @@ class Store extends ChangeNotifier {
           FixedExpense(
             id: '${p.id}-fx-1',
             periodId: p.id,
-            name: 'Коммуналка',
+            name: 'Комуналка',
             amount: utilityConfig.plan ?? 4000,
             order: 1,
             kind: FixedKind.utilities,
@@ -841,7 +841,7 @@ class Store extends ChangeNotifier {
       _putQuiet(RecType.period, p.id, p.toData());
       final fixed = [
         ('Квартира', 10000.0, FixedKind.manual),
-        ('Коммуналка', 4000.0, FixedKind.utilities),
+        ('Комуналка', 4000.0, FixedKind.utilities),
       ];
       for (var i = 0; i < fixed.length; i++) {
         final id = '${p.id}-fx-$i';
@@ -851,7 +851,7 @@ class Store extends ChangeNotifier {
             FixedExpense(id: id, periodId: p.id, name: fixed[i].$1, amount: fixed[i].$2, order: i, kind: fixed[i].$3)
                 .toData());
       }
-      final credits = [('Кредит 1', 1850.0), ('Кредит 2', 666.0), ('Кредит 3', 640.0), ('Проценты', 700.0)];
+      final credits = [('Кредит 1', 1850.0), ('Кредит 2', 666.0), ('Кредит 3', 640.0), ('Відсотки', 700.0)];
       for (var i = 0; i < credits.length; i++) {
         final id = '${p.id}-cr-$i';
         _putQuiet(RecType.credit, id,

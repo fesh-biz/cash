@@ -12,7 +12,7 @@ class AppScope extends InheritedWidget {
 
   static AppScope of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AppScope>();
-    assert(scope != null, 'AppScope не найден');
+    assert(scope != null, 'AppScope не знайдено');
     return scope!;
   }
 

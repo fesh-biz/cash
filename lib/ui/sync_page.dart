@@ -32,15 +32,15 @@ class SyncPage extends StatelessWidget {
           ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
         final thisDevice = SectionCard(
-          title: 'Это устройство',
+          title: 'Цей пристрій',
           children: [
             ListTile(
               leading: const Icon(Icons.badge_outlined),
-              title: const Text('Название'),
+              title: const Text('Назва'),
               subtitle: Text(s.deviceName),
               trailing: const Icon(Icons.edit_outlined),
               onTap: () async {
-                final v = await showTextDialog(context, title: 'Название устройства', initial: s.deviceName);
+                final v = await showTextDialog(context, title: 'Назва пристрою', initial: s.deviceName);
                 if (v != null && v.isNotEmpty) {
                   s.deviceName = v;
                   store.saveSettings();
@@ -49,51 +49,51 @@ class SyncPage extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.lan_outlined),
-              title: const Text('Адрес в сети'),
+              title: const Text('Адреса в мережі'),
               subtitle: Text(
                 sync.serverError ??
                     (sync.addresses.isEmpty
-                        ? 'Нет подключения к сети'
+                        ? 'Немає підключення до мережі'
                         : sync.addresses.map((a) => '$a:${sync.port ?? kSyncPort}').join('\n')),
               ),
             ),
             if (sync.discoveryError != null)
               ListTile(
                 leading: Icon(Icons.warning_amber_outlined, color: t.colorScheme.error),
-                title: const Text('Автопоиск устройств'),
-                subtitle: Text('${sync.discoveryError}\nДобавьте устройство по IP-адресу.'),
+                title: const Text('Автопошук пристроїв'),
+                subtitle: Text('${sync.discoveryError}\nДодайте пристрій за IP-адресою.'),
               ),
           ],
         );
 
         final keyCard = SectionCard(
-          title: 'Код синхронизации',
+          title: 'Код синхронізації',
           children: [
             ListTile(
               leading: Icon(
                 s.syncKey.isEmpty ? Icons.key_off_outlined : Icons.key_outlined,
                 color: s.syncKey.isEmpty ? t.colorScheme.error : t.colorScheme.primary,
               ),
-              title: Text(s.syncKey.isEmpty ? 'Не задан' : '•' * min(12, s.syncKey.length)),
+              title: Text(s.syncKey.isEmpty ? 'Не задано' : '•' * min(12, s.syncKey.length)),
               subtitle: const Text(
-                'Одинаковый на всех ваших устройствах. Без него другие устройства в сети '
-                'не смогут прочитать или изменить данные.',
+                'Однаковий на всіх ваших пристроях. Без нього інші пристрої в мережі '
+                'не зможуть прочитати чи змінити дані.',
               ),
               trailing: const Icon(Icons.edit_outlined),
               onTap: () async {
                 final v = await showTextDialog(
                   context,
-                  title: 'Код синхронизации',
+                  title: 'Код синхронізації',
                   initial: s.syncKey,
                   label: 'Код',
                   obscure: true,
-                  help: 'Придумайте код (не короче 6 символов) или сгенерируйте его здесь, '
-                      'затем введите такой же на другом устройстве.',
+                  help: 'Придумайте код (не коротший за 6 символів) або згенеруйте його тут, '
+                      'потім введіть такий самий на іншому пристрої.',
                   generate: _generateKey,
                 );
                 if (v == null) return;
                 if (v.isNotEmpty && v.length < 6) {
-                  if (context.mounted) showSnack(context, 'Код слишком короткий — нужно от 6 символов');
+                  if (context.mounted) showSnack(context, 'Код закороткий — потрібно щонайменше 6 символів');
                   return;
                 }
                 s.syncKey = v;
@@ -103,8 +103,8 @@ class SyncPage extends StatelessWidget {
             ),
             SwitchListTile(
               secondary: const Icon(Icons.autorenew),
-              title: const Text('Автоматическая синхронизация'),
-              subtitle: const Text('После каждого изменения и раз в 20 секунд, пока приложение открыто'),
+              title: const Text('Автоматична синхронізація'),
+              subtitle: const Text('Після кожної зміни та раз на 20 секунд, поки застосунок відкритий'),
               value: s.autoSync,
               onChanged: (v) {
                 s.autoSync = v;
@@ -115,20 +115,20 @@ class SyncPage extends StatelessWidget {
         );
 
         final peersCard = SectionCard(
-          title: 'Устройства',
+          title: 'Пристрої',
           trailing: TextButton.icon(
             icon: const Icon(Icons.add_link),
-            label: const Text('По IP'),
+            label: const Text('За IP'),
             onPressed: () => _addManual(context, sync),
           ),
           children: [
             if (peers.isEmpty)
               const ListTile(
                 leading: Icon(Icons.search),
-                title: Text('Ищем устройства в сети…'),
+                title: Text('Шукаємо пристрої в мережі…'),
                 subtitle: Text(
-                  'Откройте приложение на другом устройстве в той же Wi‑Fi сети. '
-                  'Если оно не появляется — добавьте его по IP-адресу.',
+                  'Відкрийте застосунок на іншому пристрої в тій самій мережі Wi‑Fi. '
+                  'Якщо він не з’являється — додайте його за IP-адресою.',
                 ),
               ),
             for (final p in peers) _PeerTile(peer: p, sync: sync),
@@ -138,7 +138,7 @@ class SyncPage extends StatelessWidget {
                 icon: sync.anyBusy
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.sync),
-                label: const Text('Синхронизировать сейчас'),
+                label: const Text('Синхронізувати зараз'),
                 onPressed: (!sync.hasKey || sync.anyBusy || peers.isEmpty) ? null : () => sync.syncAll(force: true),
               ),
             ),
@@ -146,23 +146,23 @@ class SyncPage extends StatelessWidget {
         );
 
         final help = SectionCard(
-          title: 'Как это работает',
+          title: 'Як це працює',
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
           children: [
             Text(
-              '1. Оба устройства подключены к одной сети (один роутер / Wi‑Fi).\n'
-              '2. На обоих задан одинаковый код синхронизации.\n'
-              '3. Устройства находят друг друга сами и обмениваются изменениями напрямую — '
-              'без интернета и без внешних серверов.\n'
-              '4. Если одну и ту же запись изменили на двух устройствах, остаётся более поздняя правка.\n\n'
-              'Windows: при первом запуске разрешите приложению доступ в «Частных сетях» '
-              'в окне брандмауэра. Сеть Wi‑Fi в Windows должна быть «Частной».',
+              '1. Обидва пристрої підключено до однієї мережі (один роутер / Wi‑Fi).\n'
+              '2. На обох задано однаковий код синхронізації.\n'
+              '3. Пристрої самі знаходять один одного й обмінюються змінами напряму — '
+              'без інтернету й без зовнішніх серверів.\n'
+              '4. Якщо той самий запис змінили на двох пристроях, залишається пізніша зміна.\n\n'
+              'Windows: під час першого запуску дозвольте застосунку доступ у «Приватних мережах» '
+              'у вікні брандмауера. Мережа Wi‑Fi у Windows має бути «Приватною».',
               style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant),
             ),
             if (store.dataPath != null) ...[
               const SizedBox(height: 8),
               SelectableText(
-                'Файл данных: ${store.dataPath}',
+                'Файл даних: ${store.dataPath}',
                 style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
               ),
             ],
@@ -207,15 +207,15 @@ class SyncPage extends StatelessWidget {
   Future<void> _addManual(BuildContext context, SyncService sync) async {
     final v = await showTextDialog(
       context,
-      title: 'Добавить устройство по IP',
-      label: 'IP-адрес',
-      help: 'Адрес указан на другом устройстве: вкладка «Синхронизация» → «Адрес в сети». '
-          'Например: 192.168.1.20',
+      title: 'Додати пристрій за IP',
+      label: 'IP-адреса',
+      help: 'Адресу вказано на іншому пристрої: вкладка «Синхронізація» → «Адреса в мережі». '
+          'Наприклад: 192.168.1.20',
     );
     if (v == null || v.isEmpty) return;
     final err = await sync.addManual(v);
     if (context.mounted) {
-      showSnack(context, err ?? 'Устройство добавлено');
+      showSnack(context, err ?? 'Пристрій додано');
     }
   }
 }
@@ -230,8 +230,8 @@ class _PeerTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     final p = peer;
-    final lines = <String>['${p.host}:${p.port} · ${p.online ? 'в сети' : 'не в сети'}'];
-    if (p.lastSync != null) lines.add('Синхронизировано: ${fmtTimeAgo(p.lastSync!)}');
+    final lines = <String>['${p.host}:${p.port} · ${p.online ? 'в мережі' : 'не в мережі'}'];
+    if (p.lastSync != null) lines.add('Синхронізовано: ${fmtTimeAgo(p.lastSync!)}');
     if (p.error != null && (p.hasProblem || !p.networkError)) lines.add(p.error!);
     return ListTile(
       leading: Icon(
@@ -254,17 +254,17 @@ class _PeerTile extends StatelessWidget {
                 } else if (v == 'forget') {
                   final ok = await confirm(
                     context,
-                    'Забыть устройство?',
-                    '«${p.name}» будет удалено из списка. Если оно снова появится в сети, '
-                        'синхронизация начнётся заново.',
-                    action: 'Забыть',
+                    'Забути пристрій?',
+                    '«${p.name}» буде видалено зі списку. Якщо він знову з’явиться в мережі, '
+                        'синхронізація почнеться заново.',
+                    action: 'Забути',
                   );
                   if (ok) sync.forget(p.id);
                 }
               },
               itemBuilder: (_) => const [
-                PopupMenuItem(value: 'sync', child: Text('Синхронизировать')),
-                PopupMenuItem(value: 'forget', child: Text('Забыть')),
+                PopupMenuItem(value: 'sync', child: Text('Синхронізувати')),
+                PopupMenuItem(value: 'forget', child: Text('Забути')),
               ],
             ),
     );

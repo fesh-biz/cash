@@ -112,6 +112,12 @@ class Period {
 }
 
 /// Обязательный расход периода (квартира, коммуналка…).
+/// Строка коммуналки по названию: «Коммуналка» (старые записи) или «Комуналка».
+bool isUtilitiesName(String name) {
+  final n = name.toLowerCase();
+  return n.contains('коммунал') || n.contains('комунал');
+}
+
 class FixedExpense {
   FixedExpense({
     required this.id,
@@ -142,7 +148,7 @@ class FixedExpense {
   final DateTime? readingDate;
 
   bool get isUtilities =>
-      kind == FixedKind.utilities || (kind.isEmpty && name.toLowerCase().contains('коммунал'));
+      kind == FixedKind.utilities || (kind.isEmpty && isUtilitiesName(name));
 
   FixedExpense resolved({required double amount, required bool isActual, DateTime? readingDate}) => FixedExpense(
         id: id,

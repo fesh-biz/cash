@@ -210,7 +210,7 @@ class SyncService extends ChangeNotifier {
         server.listen(_handle, onError: (Object e) => debugPrint('server: $e'));
         return;
       } catch (e) {
-        serverError = 'Не удалось открыть порт: $e';
+        serverError = 'Не вдалося відкрити порт: $e';
       }
     }
   }
@@ -227,7 +227,7 @@ class SyncService extends ChangeNotifier {
       _udp = s;
       discoveryError = null;
     } catch (e) {
-      discoveryError = 'Поиск устройств недоступен: $e';
+      discoveryError = 'Пошук пристроїв недоступний: $e';
       try {
         // Хотя бы отправлять о себе, даже если порт приёма занят.
         final s = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
@@ -451,29 +451,29 @@ class SyncService extends ChangeNotifier {
       if (res.statusCode == 403) {
         switch (json['error']) {
           case 'no_key':
-            throw SyncException('На «${p.name}» не задан код синхронизации');
+            throw SyncException('На «${p.name}» не задано код синхронізації');
           case 'clock':
-            throw SyncException('Часы устройств расходятся больше чем на 2 часа');
+            throw SyncException('Годинники пристроїв розходяться більш ніж на 2 години');
           default:
-            throw SyncException('Код синхронизации не совпадает');
+            throw SyncException('Код синхронізації не збігається');
         }
       }
       if (res.statusCode != 200) {
-        throw SyncException('Ошибка ${res.statusCode} на «${p.name}»');
+        throw SyncException('Помилка ${res.statusCode} на «${p.name}»');
       }
       if (signed) {
         final got = res.headers.value('x-cash-sig') ?? '';
         if (!_safeEquals(got, _sign(key, 'res\n$sig\n$text'))) {
-          throw SyncException('Ответ не подписан кодом синхронизации');
+          throw SyncException('Відповідь не підписано кодом синхронізації');
         }
       }
       return json;
     } on SocketException catch (_) {
-      throw SyncException('Нет связи с ${p.host}:${p.port}', network: true);
+      throw SyncException('Немає зв’язку з ${p.host}:${p.port}', network: true);
     } on TimeoutException catch (_) {
-      throw SyncException('${p.host}:${p.port} не отвечает', network: true);
+      throw SyncException('${p.host}:${p.port} не відповідає', network: true);
     } on HttpException catch (e) {
-      throw SyncException('Ошибка связи: ${e.message}');
+      throw SyncException('Помилка зв’язку: ${e.message}');
     } finally {
       client.close(force: true);
     }
@@ -482,18 +482,18 @@ class SyncService extends ChangeNotifier {
   /// Добавить устройство по IP (если broadcast в сети не работает).
   Future<String?> addManual(String input) async {
     var text = input.trim();
-    if (text.isEmpty) return 'Введите IP-адрес';
+    if (text.isEmpty) return 'Введіть IP-адресу';
     var p = kSyncPort;
     final m = RegExp(r'^([0-9.]+)(?::(\d+))?$').firstMatch(text);
-    if (m == null) return 'Формат: 192.168.1.20 или 192.168.1.20:47800';
+    if (m == null) return 'Формат: 192.168.1.20 або 192.168.1.20:47800';
     text = m.group(1)!;
     if (m.group(2) != null) p = int.parse(m.group(2)!);
     final probe = Peer(id: '?', name: text, host: text, port: p);
     try {
       final hello = await _call(probe, 'GET', '/cash/hello', signed: false);
       final id = hello['id'];
-      if (hello['app'] != 'cash' || id is! String) return 'По этому адресу не приложение Cash';
-      if (id == store.deviceId) return 'Это адрес этого же устройства';
+      if (hello['app'] != 'cash' || id is! String) return 'За цією адресою не застосунок Cash';
+      if (id == store.deviceId) return 'Це адреса цього ж пристрою';
       final peer = _touchPeer(id, hello['name'] is String ? hello['name'] as String : text, text, p);
       final hostKey = p == kSyncPort ? text : '$text:$p';
       if (!store.settings.manualHosts.contains(hostKey)) {
@@ -542,7 +542,7 @@ class SyncService extends ChangeNotifier {
     }
     if (!force && p._retryAfter != null && DateTime.now().isBefore(p._retryAfter!)) return;
     if (!hasKey) {
-      p.error = 'Задайте код синхронизации';
+      p.error = 'Задайте код синхронізації';
       notifyListeners();
       return;
     }
@@ -554,7 +554,7 @@ class SyncService extends ChangeNotifier {
       // 1. Забираем изменения того устройства.
       var data = await _call(p, 'GET', '/cash/changes?since=${cur.pull}');
       if (data['id'] != p.id) {
-        throw SyncException('По адресу ${p.host} теперь другое устройство');
+        throw SyncException('За адресою ${p.host} тепер інший пристрій');
       }
       var maxSeq = (data['maxSeq'] as num?)?.toInt() ?? 0;
       if (maxSeq < cur.pull) {

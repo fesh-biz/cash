@@ -50,7 +50,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
     if (_addAnother && ex == null) {
       _amount.clear();
       _note.clear();
-      showSnack(context, 'Добавлено: ${money(v)}');
+      showSnack(context, 'Додано: ${money(v)}');
       return;
     }
     Navigator.pop(context);
@@ -63,7 +63,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
     final messengerContext = Navigator.of(context).context;
     store.remove(ex.id);
     Navigator.pop(context);
-    showSnack(messengerContext, 'Расход ${money(ex.amount)} удалён', undo: () => store.restore(ex.id));
+    showSnack(messengerContext, 'Витрату ${money(ex.amount)} видалено', undo: () => store.restore(ex.id));
   }
 
   @override
@@ -80,7 +80,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(isNew ? 'Новый расход' : 'Расход', style: t.textTheme.titleLarge),
+          Text(isNew ? 'Нова витрата' : 'Витрата', style: t.textTheme.titleLarge),
           const SizedBox(height: 16),
           AmountField(controller: _amount, autofocus: true, onSubmitted: _save),
           const SizedBox(height: 12),
@@ -89,7 +89,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
             textCapitalization: TextCapitalization.sentences,
             textInputAction: TextInputAction.done,
             decoration: const InputDecoration(
-              labelText: 'Комментарий (необязательно)',
+              labelText: 'Коментар (необов’язково)',
               border: OutlineInputBorder(),
             ),
             onSubmitted: (_) => _save(),
@@ -116,7 +116,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
             children: [
               OutlinedButton.icon(
                 icon: const Icon(Icons.event_outlined),
-                label: Text(isToday ? 'Сегодня, ${fmtDay(_date)}' : '${fmtWeekday(_date)}, ${fmtDay(_date)}'),
+                label: Text(isToday ? 'Сьогодні, ${fmtDay(_date)}' : '${fmtWeekday(_date)}, ${fmtDay(_date)}'),
                 onPressed: () async {
                   final d = await pickDate(context, _date);
                   if (d != null && mounted) setState(() => _date = d);
@@ -125,7 +125,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
               if (!isToday)
                 TextButton(
                   onPressed: () => setState(() => _date = today()),
-                  child: const Text('Сегодня'),
+                  child: const Text('Сьогодні'),
                 ),
             ],
           ),
@@ -135,22 +135,22 @@ class _ExpenseFormState extends State<_ExpenseForm> {
               controlAffinity: ListTileControlAffinity.leading,
               value: _addAnother,
               onChanged: (v) => setState(() => _addAnother = v ?? false),
-              title: const Text('Добавить ещё один после сохранения'),
+              title: const Text('Додати ще одну після збереження'),
             ),
           const SizedBox(height: 12),
           Row(
             children: [
               if (!isNew)
                 IconButton(
-                  tooltip: 'Удалить',
+                  tooltip: 'Видалити',
                   color: t.colorScheme.error,
                   icon: const Icon(Icons.delete_outline),
                   onPressed: _delete,
                 ),
               const Spacer(),
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Скасувати')),
               const SizedBox(width: 8),
-              FilledButton(onPressed: _save, child: const Text('Сохранить')),
+              FilledButton(onPressed: _save, child: const Text('Зберегти')),
             ],
           ),
         ],
@@ -192,7 +192,7 @@ class _DaySheet extends StatelessWidget {
                       children: [
                         Text('${fmtWeekdayLong(day)}, ${fmtDayLong(day)}', style: t.textTheme.titleLarge),
                         Text(
-                          list.isEmpty ? 'Расходов нет' : 'Потрачено ${money(total)}',
+                          list.isEmpty ? 'Витрат немає' : 'Витрачено ${money(total)}',
                           style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant),
                         ),
                       ],
@@ -200,7 +200,7 @@ class _DaySheet extends StatelessWidget {
                   ),
                   FilledButton.tonalIcon(
                     icon: const Icon(Icons.add),
-                    label: const Text('Добавить'),
+                    label: const Text('Додати'),
                     onPressed: () => showExpenseEditor(context, date: day),
                   ),
                 ],
@@ -211,7 +211,7 @@ class _DaySheet extends StatelessWidget {
               child: list.isEmpty
                   ? const Padding(
                       padding: EdgeInsets.all(24),
-                      child: Center(child: Text('Нажмите «Добавить», чтобы записать расход')),
+                      child: Center(child: Text('Натисніть «Додати», щоб записати витрату')),
                     )
                   : ListView(
                       shrinkWrap: true,
@@ -224,11 +224,11 @@ class _DaySheet extends StatelessWidget {
                             ),
                             subtitle: e.note.isEmpty ? null : Text(e.note),
                             trailing: IconButton(
-                              tooltip: 'Удалить',
+                              tooltip: 'Видалити',
                               icon: const Icon(Icons.delete_outline),
                               onPressed: () {
                                 store.remove(e.id);
-                                showSnack(context, 'Расход ${money(e.amount)} удалён',
+                                showSnack(context, 'Витрату ${money(e.amount)} видалено',
                                     undo: () => store.restore(e.id));
                               },
                             ),

@@ -28,7 +28,7 @@ class PeriodPage extends StatelessWidget {
       return Center(
         child: FilledButton.icon(
           icon: const Icon(Icons.add),
-          label: const Text('Создать период'),
+          label: const Text('Створити період'),
           onPressed: () => onSelectPeriod(store.createFirstPeriod(DateTime.now()).id),
         ),
       );
@@ -42,7 +42,7 @@ class PeriodPage extends StatelessWidget {
     final t = Theme.of(context);
 
     final datesCard = SectionCard(
-      title: 'Даты',
+      title: 'Дати',
       children: [
         ListTile(
           leading: const Icon(Icons.date_range_outlined),
@@ -55,14 +55,14 @@ class PeriodPage extends StatelessWidget {
     );
 
     final incomeCard = SectionCard(
-      title: 'Доход',
+      title: 'Дохід',
       children: [
         AmountTile(
-          title: 'В месяц, €',
+          title: 'На місяць, €',
           amount: p.incomeEur,
           amountText: '${numStr(p.incomeEur)} €',
           onTap: () async {
-            final v = await showNumberDialog(context, title: 'Доход в евро', initial: p.incomeEur, suffix: '€');
+            final v = await showNumberDialog(context, title: 'Дохід у євро', initial: p.incomeEur, suffix: '€');
             if (v != null) store.savePeriod(p.copyWith(incomeEur: v));
           },
         ),
@@ -71,66 +71,66 @@ class PeriodPage extends StatelessWidget {
           amount: p.rate,
           amountText: numStr(p.rate),
           onTap: () async {
-            final v = await showNumberDialog(context, title: 'Курс евро', initial: p.rate, suffix: '₴');
+            final v = await showNumberDialog(context, title: 'Курс євро', initial: p.rate, suffix: '₴');
             if (v != null) store.savePeriod(p.copyWith(rate: v));
           },
         ),
         const Divider(indent: 16, endIndent: 16),
-        AmountTile(title: 'В гривнах', amount: p.incomeUah, bold: true),
+        AmountTile(title: 'У гривнях', amount: p.incomeUah, bold: true),
       ],
     );
 
     final fixedCard = SectionCard(
-      title: 'Обязательные расходы',
+      title: 'Обов’язкові витрати',
       trailing: IconButton(
-        tooltip: 'Добавить',
+        tooltip: 'Додати',
         icon: const Icon(Icons.add),
         onPressed: () => _editFixed(context, store, p, null, fixed.length),
       ),
       children: [
-        if (fixed.isEmpty) const ListTile(title: Text('Нет обязательных расходов')),
+        if (fixed.isEmpty) const ListTile(title: Text('Немає обов’язкових витрат')),
         for (final f in fixed)
           if (f.isUtilities)
             AmountTile(
-              title: f.name.isEmpty ? 'Коммуналка' : f.name,
+              title: f.name.isEmpty ? 'Комуналка' : f.name,
               amount: f.amount,
               subtitle: f.isActual && f.readingDate != null
-                  ? 'по показаниям ${fmtDate(f.readingDate!)}'
-                  : 'план · уточнится по показаниям${_dueSuffix(p)}',
+                  ? 'за показниками ${fmtDate(f.readingDate!)}'
+                  : 'план · уточниться за показниками${_dueSuffix(p)}',
               leading: Icon(f.isActual ? Icons.check_circle_outline : Icons.schedule,
                   color: f.isActual ? positiveColor(context) : t.colorScheme.onSurfaceVariant),
               onTap: () => _utilitiesActions(context, store, p, f),
             )
           else
             AmountTile(
-              title: f.name.isEmpty ? 'Без названия' : f.name,
+              title: f.name.isEmpty ? 'Без назви' : f.name,
               amount: f.amount,
               onTap: () => _editFixed(context, store, p, f, f.order),
             ),
         AmountTile(
-          title: 'Кредиты (плачу)',
+          title: 'Кредити (плачу)',
           amount: p.creditPlan,
-          subtitle: 'подробнее — на вкладке «Кредиты»',
+          subtitle: 'детальніше — на вкладці «Кредити»',
           onTap: () async {
-            final v = await showNumberDialog(context, title: 'Плачу на кредиты', initial: p.creditPlan);
+            final v = await showNumberDialog(context, title: 'Плачу на кредити', initial: p.creditPlan);
             if (v != null) store.savePeriod(p.copyWith(creditPlan: v));
           },
         ),
         const Divider(indent: 16, endIndent: 16),
-        AmountTile(title: 'Всего', amount: fixedTotal + p.creditPlan, bold: true),
+        AmountTile(title: 'Усього', amount: fixedTotal + p.creditPlan, bold: true),
       ],
     );
 
     final resultCard = SectionCard(
-      title: 'Итог',
+      title: 'Підсумок',
       children: [
         AmountTile(
-          title: 'Остаток на период',
+          title: 'Залишок на період',
           amount: available,
           bold: true,
           color: balanceColor(context, available),
         ),
-        AmountTile(title: 'В день', amount: perDay, bold: true, color: balanceColor(context, perDay)),
+        AmountTile(title: 'На день', amount: perDay, bold: true, color: balanceColor(context, perDay)),
       ],
     );
 
@@ -141,23 +141,23 @@ class PeriodPage extends StatelessWidget {
         if (!hasNext)
           FilledButton.tonalIcon(
             icon: const Icon(Icons.skip_next),
-            label: const Text('Создать следующий период'),
+            label: const Text('Створити наступний період'),
             onPressed: () {
               final next = store.createNextPeriod(p);
               onSelectPeriod(next.id);
-              showSnack(context, 'Создан период ${fmtRange(next.start, next.end)}');
+              showSnack(context, 'Створено період ${fmtRange(next.start, next.end)}');
             },
           ),
         OutlinedButton.icon(
           style: OutlinedButton.styleFrom(foregroundColor: t.colorScheme.error),
           icon: const Icon(Icons.delete_outline),
-          label: const Text('Удалить период'),
+          label: const Text('Видалити період'),
           onPressed: () async {
             final ok = await confirm(
               context,
-              'Удалить период?',
-              'Будут удалены настройки периода ${fmtRange(p.start, p.end)}, обязательные расходы '
-                  'и кредиты. Ежедневные расходы останутся.',
+              'Видалити період?',
+              'Буде видалено налаштування періоду ${fmtRange(p.start, p.end)}, обов’язкові витрати '
+                  'і кредити. Щоденні витрати залишаться.',
             );
             if (!ok) return;
             store.deletePeriod(p.id);
@@ -224,8 +224,8 @@ class PeriodPage extends StatelessWidget {
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
       initialDateRange: DateTimeRange(start: p.start, end: p.end),
-      helpText: 'Даты периода',
-      saveText: 'Сохранить',
+      helpText: 'Дати періоду',
+      saveText: 'Зберегти',
     );
     if (r == null) return;
     final start = dateOnly(r.start);
@@ -236,7 +236,7 @@ class PeriodPage extends StatelessWidget {
     if (overlap.isNotEmpty) {
       final o = overlap.first;
       if (context.mounted) {
-        showSnack(context, 'Пересекается с периодом ${fmtRange(o.start, o.end)}');
+        showSnack(context, 'Перетинається з періодом ${fmtRange(o.start, o.end)}');
       }
       return;
     }
@@ -246,22 +246,22 @@ class PeriodPage extends StatelessWidget {
   Future<void> _editFixed(BuildContext context, Store store, Period p, FixedExpense? f, int order) async {
     final r = await showItemDialog(
       context,
-      title: f == null ? 'Обязательный расход' : f.name,
+      title: f == null ? 'Обов’язкова витрата' : f.name,
       name: f?.name ?? '',
       amount: f?.amount,
-      nameLabel: 'Название (например, «Квартира»)',
+      nameLabel: 'Назва (наприклад, «Квартира»)',
       canDelete: f != null,
     );
     if (r == null) return;
     if (r.delete) {
       final id = f!.id;
       store.remove(id);
-      if (context.mounted) showSnack(context, 'Удалено', undo: () => store.restore(id));
+      if (context.mounted) showSnack(context, 'Видалено', undo: () => store.restore(id));
       return;
     }
     final kind = f != null
         ? (f.kind.isEmpty ? FixedKind.manual : f.kind)
-        : (r.name.toLowerCase().contains('коммунал') ? FixedKind.utilities : FixedKind.manual);
+        : (isUtilitiesName(r.name) ? FixedKind.utilities : FixedKind.manual);
     store.saveFixed(FixedExpense(
       id: f?.id ?? Store.newId(),
       periodId: p.id,
@@ -283,44 +283,44 @@ class PeriodPage extends StatelessWidget {
     final action = await showDialog<String>(
       context: context,
       builder: (ctx) => SimpleDialog(
-        title: Text(f.name.isEmpty ? 'Коммуналка' : f.name),
+        title: Text(f.name.isEmpty ? 'Комуналка' : f.name),
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
             child: Text(s.isActual
-                ? 'Сумма посчитана по показаниям счётчиков: ${moneyCents(s.amount)}.'
-                : 'Пока показаний за период нет, в бюджете стоит сумма по умолчанию: ${money(s.plan)}.'),
+                ? 'Суму пораховано за показниками лічильників: ${moneyCents(s.amount)}.'
+                : 'Поки показників за період немає, у бюджеті стоїть сума за замовчуванням: ${money(s.plan)}.'),
           ),
           SimpleDialogOption(
             onPressed: () => Navigator.pop(ctx, 'reading'),
             child: ListTile(
               leading: const Icon(Icons.speed),
-              title: Text(s.reading == null ? 'Внести показания' : 'Изменить показания'),
+              title: Text(s.reading == null ? 'Внести показники' : 'Змінити показники'),
             ),
           ),
           if (!s.isActual)
             SimpleDialogOption(
               onPressed: () => Navigator.pop(ctx, 'plan'),
-              child: const ListTile(leading: Icon(Icons.edit_outlined), title: Text('Изменить сумму по умолчанию')),
+              child: const ListTile(leading: Icon(Icons.edit_outlined), title: Text('Змінити суму за замовчуванням')),
             ),
           if (onOpenUtilities != null)
             SimpleDialogOption(
               onPressed: () => Navigator.pop(ctx, 'open'),
-              child: const ListTile(leading: Icon(Icons.receipt_long_outlined), title: Text('Открыть «Коммуналка»')),
+              child: const ListTile(leading: Icon(Icons.receipt_long_outlined), title: Text('Відкрити «Комуналка»')),
             ),
           SimpleDialogOption(
             onPressed: () => Navigator.pop(ctx, 'manual'),
             child: const ListTile(
               leading: Icon(Icons.link_off),
-              title: Text('Вводить вручную'),
-              subtitle: Text('Отключить от показаний в этом периоде'),
+              title: Text('Вводити вручну'),
+              subtitle: Text('Відключити від показників у цьому періоді'),
             ),
           ),
           SimpleDialogOption(
             onPressed: () => Navigator.pop(ctx, 'delete'),
             child: ListTile(
               leading: Icon(Icons.delete_outline, color: Theme.of(ctx).colorScheme.error),
-              title: const Text('Удалить строку'),
+              title: const Text('Видалити рядок'),
             ),
           ),
         ],
@@ -343,10 +343,10 @@ class PeriodPage extends StatelessWidget {
           order: f.order,
           kind: FixedKind.manual,
         ));
-        showSnack(context, 'Коммуналка в этом периоде теперь вводится вручную');
+        showSnack(context, 'Комуналка в цьому періоді тепер вводиться вручну');
       case 'delete':
         store.remove(f.id);
-        showSnack(context, 'Удалено', undo: () => store.restore(f.id));
+        showSnack(context, 'Видалено', undo: () => store.restore(f.id));
     }
   }
 }
@@ -364,22 +364,22 @@ class _History extends StatelessWidget {
     final all = store.periods.reversed.toList();
     final now = DateTime.now();
     return SectionCard(
-      title: 'Все периоды',
+      title: 'Усі періоди',
       children: [
         for (final x in all)
           Builder(builder: (context) {
             final s = PeriodSummary.compute(x, store.fixedOf(x.id), store.expensesBetween(x.start, x.end), now);
             final status = switch (s.state) {
-              PeriodState.active => 'идёт сейчас',
-              PeriodState.notStarted => 'ещё не начался',
-              PeriodState.finished => s.left.round() >= 0 ? 'сэкономлено' : 'перерасход',
+              PeriodState.active => 'триває зараз',
+              PeriodState.notStarted => 'ще не почався',
+              PeriodState.finished => s.left.round() >= 0 ? 'заощаджено' : 'перевитрата',
             };
             return ListTile(
               selected: x.id == current.id,
               selectedTileColor: t.colorScheme.secondaryContainer.withAlpha(110),
               leading: Icon(x.contains(now) ? Icons.radio_button_checked : Icons.radio_button_unchecked),
               title: Text(fmtRange(x.start, x.end)),
-              subtitle: Text('Потрачено ${money(s.spent)} · $status'),
+              subtitle: Text('Витрачено ${money(s.spent)} · $status'),
               trailing: Text(
                 money(s.left),
                 style: t.textTheme.titleSmall?.copyWith(

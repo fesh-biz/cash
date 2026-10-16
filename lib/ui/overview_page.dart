@@ -96,17 +96,17 @@ class _OverviewPageState extends State<OverviewPage> {
                 if (summary.state == PeriodState.active) ...[
                   const SizedBox(height: 12),
                   SectionCard(
-                    title: 'Сегодня',
+                    title: 'Сьогодні',
                     trailing: TextButton(
                       onPressed: () => showDaySheet(context, today()),
-                      child: const Text('Подробнее'),
+                      child: const Text('Детальніше'),
                     ),
                     children: [
                       if (todayList.isEmpty)
-                        const ListTile(title: Text('Расходов пока нет')),
+                        const ListTile(title: Text('Витрат поки немає')),
                       for (final e in todayList)
                         AmountTile(
-                          title: e.note.isEmpty ? 'Расход' : e.note,
+                          title: e.note.isEmpty ? 'Витрата' : e.note,
                           amount: e.amount,
                           onTap: () => showExpenseEditor(context, existing: e),
                         ),
@@ -182,29 +182,29 @@ class _Hero extends StatelessWidget {
 
     switch (s.state) {
       case PeriodState.active:
-        label = 'Остаток на сегодня';
+        label = 'Залишок на сьогодні';
         value = s.todayBalance;
         if (value.round() >= 0) {
-          sub = 'Столько ещё можно потратить сегодня, оставаясь в плане';
+          sub = 'Стільки ще можна витратити сьогодні, не виходячи за план';
         } else {
           final back = s.backToPlusDate;
           sub = back != null
-              ? 'Перерасход. Если не тратить, в плюс выйдете ${fmtDayLong(back)}'
-              : 'Перерасход: до конца периода дневной лимит его не покроет';
+              ? 'Перевитрата. Якщо не витрачати, вийдете в плюс ${fmtDayLong(back)}'
+              : 'Перевитрата: до кінця періоду денний ліміт її не покриє';
         }
-        chips.add('В день: ${money(s.perDay)}');
-        chips.add('С учётом трат: ${money(s.perDayFromToday)}/день');
+        chips.add('На день: ${money(s.perDay)}');
+        chips.add('З урахуванням витрат: ${money(s.perDayFromToday)}/день');
         final toPlus = s.daysToPlus;
-        chips.add(toPlus != null ? 'В плюс через ${daysStr(toPlus)}' : 'Осталось ${daysStr(s.daysLeft)}');
-        if (s.spentToday != 0) chips.add('Сегодня: ${money(s.spentToday)}');
+        chips.add(toPlus != null ? 'У плюс через ${daysStr(toPlus)}' : 'Залишилось ${daysStr(s.daysLeft)}');
+        if (s.spentToday != 0) chips.add('Сьогодні: ${money(s.spentToday)}');
       case PeriodState.notStarted:
-        label = 'Период ещё не начался';
+        label = 'Період ще не почався';
         value = s.available;
-        sub = 'Начнётся ${fmtDayLong(s.period.start)} · ${money(s.perDay)} в день';
+        sub = 'Почнеться ${fmtDayLong(s.period.start)} · ${money(s.perDay)} на день';
       case PeriodState.finished:
-        label = 'Период завершён';
+        label = 'Період завершено';
         value = s.left;
-        sub = value.round() >= 0 ? 'Сэкономлено за период' : 'Перерасход за период';
+        sub = value.round() >= 0 ? 'Заощаджено за період' : 'Перевитрата за період';
     }
 
     // Карточка всегда в основных (голубых) тонах приложения, и при перерасходе тоже.
@@ -259,7 +259,7 @@ class _Hero extends StatelessWidget {
               FilledButton.icon(
                 onPressed: onCreateNext,
                 icon: const Icon(Icons.skip_next),
-                label: const Text('Создать следующий период'),
+                label: const Text('Створити наступний період'),
               ),
             ],
           ],
@@ -293,33 +293,33 @@ class _Stats extends StatelessWidget {
       minTileWidth: 150,
       children: [
         StatTile(
-          label: 'Доход',
+          label: 'Дохід',
           value: money(p.incomeUah),
           hint: '${numStr(p.incomeEur)} € × ${numStr(p.rate)}',
           onTap: () => onOpenTab(2),
         ),
         StatTile(
-          label: 'Обязательные',
+          label: 'Обов’язкові',
           value: money(s.fixedTotal),
           hint: fixedNames.isEmpty ? null : fixedNames,
           onTap: () => onOpenTab(2),
         ),
         StatTile(
-          label: 'На кредиты',
+          label: 'На кредити',
           value: money(p.creditPlan),
           hint: creditLeft.round() > 0
-              ? 'внесено ${money(deposited)} · ещё ${money(creditLeft)}'
+              ? 'внесено ${money(deposited)} · ще ${money(creditLeft)}'
               : 'внесено ${money(deposited)}',
           onTap: () => onOpenTab(1),
         ),
         StatTile(
-          label: 'На период',
+          label: 'На період',
           value: money(s.available),
           hint: '${daysStr(p.days)} · ${money(s.perDay)}/день',
         ),
-        StatTile(label: 'Потрачено', value: money(s.spent)),
+        StatTile(label: 'Витрачено', value: money(s.spent)),
         StatTile(
-          label: 'Осталось',
+          label: 'Залишилось',
           value: money(s.left),
           color: balanceColor(context, s.left),
         ),
@@ -355,15 +355,15 @@ class _UtilityReminder extends StatelessWidget {
                 Icon(Icons.speed, color: fg),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text('Пора снять показания счётчиков',
+                  child: Text('Час зняти показники лічильників',
                       style: t.textTheme.titleSmall?.copyWith(color: fg, fontWeight: FontWeight.w600)),
                 ),
               ],
             ),
             const SizedBox(height: 4),
             Text(
-              'Сейчас коммуналка в бюджете — план ${money(plan)}. '
-              'После ввода показаний подставится точная сумма.',
+              'Зараз комуналка в бюджеті — план ${money(plan)}. '
+              'Після введення показників підставиться точна сума.',
               style: t.textTheme.bodyMedium?.copyWith(color: fg),
             ),
             const SizedBox(height: 8),
@@ -373,12 +373,12 @@ class _UtilityReminder extends StatelessWidget {
               children: [
                 FilledButton(
                   onPressed: () => showReadingEditor(context, date: today()),
-                  child: const Text('Внести показания'),
+                  child: const Text('Внести показники'),
                 ),
                 TextButton(
                   style: TextButton.styleFrom(foregroundColor: fg),
                   onPressed: onOpen,
-                  child: const Text('Коммуналка'),
+                  child: const Text('Комуналка'),
                 ),
               ],
             ),
@@ -403,8 +403,8 @@ class _DaysHeader extends StatelessWidget {
       child: Row(
         children: [
           Expanded(flex: 4, child: Text('День', style: style)),
-          Expanded(flex: 4, child: Text('Потрачено', style: style, textAlign: TextAlign.right)),
-          Expanded(flex: 4, child: Text('Остаток', style: style, textAlign: TextAlign.right)),
+          Expanded(flex: 4, child: Text('Витрачено', style: style, textAlign: TextAlign.right)),
+          Expanded(flex: 4, child: Text('Залишок', style: style, textAlign: TextAlign.right)),
         ],
       ),
     );
@@ -475,7 +475,7 @@ class _DayRowTile extends StatelessWidget {
                     if (isPlusDay) ...[
                       const SizedBox(width: 6),
                       Tooltip(
-                        message: 'С этого дня остаток в плюсе, если больше не тратить',
+                        message: 'З цього дня залишок у плюсі, якщо більше не витрачати',
                         child: Icon(Icons.flag, size: 16, color: plusColor),
                       ),
                     ],
@@ -540,19 +540,19 @@ class _Welcome extends StatelessWidget {
             children: [
               Icon(Icons.account_balance_wallet_outlined, size: 56, color: t.colorScheme.primary),
               const SizedBox(height: 16),
-              Text('Учёт финансов', style: t.textTheme.headlineMedium, textAlign: TextAlign.center),
+              Text('Облік фінансів', style: t.textTheme.headlineMedium, textAlign: TextAlign.center),
               const SizedBox(height: 8),
               Text(
-                'Доход за период минус обязательные расходы и кредиты — '
-                'это сумма на жизнь. Она делится на дни, а приложение показывает, '
-                'сколько можно потратить сегодня.',
+                'Дохід за період мінус обов’язкові витрати й кредити — '
+                'це сума на життя. Вона ділиться на дні, а застосунок показує, '
+                'скільки можна витратити сьогодні.',
                 style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
               FilledButton.icon(
                 icon: const Icon(Icons.table_chart_outlined),
-                label: const Text('Перенести данные из таблицы'),
+                label: const Text('Перенести дані з таблиці'),
                 onPressed: () {
                   final p = store.loadSample();
                   onSelectPeriod(p.id);
@@ -560,15 +560,15 @@ class _Welcome extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Период 10.10–09.11.2026: курс 51, 740 €, квартира, коммуналка, '
-                'кредиты, расходы за 10–13 октября и показания счётчиков за 2026 год.',
+                'Період 10.10–09.11.2026: курс 51, 740 €, квартира, комуналка, '
+                'кредити, витрати за 10–13 жовтня і показники лічильників за 2026 рік.',
                 style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
               OutlinedButton.icon(
                 icon: const Icon(Icons.add),
-                label: const Text('Создать новый период'),
+                label: const Text('Створити новий період'),
                 onPressed: () {
                   final p = store.createFirstPeriod(DateTime.now());
                   onSelectPeriod(p.id);
@@ -578,7 +578,7 @@ class _Welcome extends StatelessWidget {
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 icon: const Icon(Icons.sync),
-                label: const Text('Получить данные с другого устройства'),
+                label: const Text('Отримати дані з іншого пристрою'),
                 onPressed: () => onOpenTab(4),
               ),
             ],

@@ -11,15 +11,15 @@ void main() {
     await tester.pumpWidget(CashApp(store: store, sync: sync));
     await tester.pumpAndSettle();
 
-    expect(find.text('Учёт финансов'), findsOneWidget);
-    await tester.tap(find.text('Перенести данные из таблицы'));
+    expect(find.text('Облік фінансів'), findsOneWidget);
+    await tester.tap(find.text('Перенести дані з таблиці'));
     await tester.pumpAndSettle();
 
     expect(store.periods.length, 1);
-    expect(find.text('Потрачено'), findsWidgets);
+    expect(find.text('Витрачено'), findsWidgets);
 
     // Переход по вкладкам не падает.
-    for (final tab in ['Кредиты', 'Период', 'Коммуналка', 'Синхронизация', 'Бюджет']) {
+    for (final tab in ['Кредити', 'Період', 'Комуналка', 'Синхронізація', 'Бюджет']) {
       await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.byTooltip(tab)));
       await tester.pumpAndSettle();
       // Название вкладки — в заголовке страницы.
@@ -27,10 +27,10 @@ void main() {
     }
 
     // Вкладка «Коммуналка»: показания из таблицы на месте.
-    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.byTooltip('Коммуналка')));
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.byTooltip('Комуналка')));
     await tester.pumpAndSettle();
     expect(store.meterReadings.length, 10);
-    expect(find.text('Сумма по умолчанию'), findsOneWidget);
+    expect(find.text('Сума за замовчуванням'), findsOneWidget);
     expect(find.byType(Scaffold), findsWidgets);
 
     // Сбрасываем таймер отложенного сохранения.
