@@ -142,10 +142,17 @@ Cash, собранного раньше на компьютере, дайте Gi
    ```powershell
    [Convert]::ToBase64String([IO.File]::ReadAllBytes("$env:USERPROFILE\.android\debug.keystore")) | Set-Clipboard
    ```
-2. GitHub → репозиторий → **Settings → Secrets and variables → Actions →
-   New repository secret**. Name: `ANDROID_DEBUG_KEYSTORE`, Secret — вставьте
-   из буфера, **Add secret**.
+2. GitHub → репозиторий → **Settings → Secrets and variables → Actions**,
+   вкладка **Secrets**, блок **Repository secrets** → **New repository secret**.
+   Name: `ANDROID_DEBUG_KEYSTORE`, Secret — вставьте из буфера, **Add secret**.
+   (Разделы Codespaces, Dependabot и Environment secrets сборке не видны;
+   переменная с тем же именем на вкладке Variables тоже подойдёт.)
 3. **Actions → build → Run workflow** — пересобрать с этим ключом.
+
+Проверка: в описании релиза указан отпечаток ключа «Підпис APK (SHA-256)».
+Отпечаток APK, который уже стоит на телефоне (если собирали на ПК), —
+`python scripts\apk_cert.py dist\Cash.apk`. Совпадают — новый APK встанет
+поверх старого.
 
 Без секрета сборка тоже пройдёт, но APK будет подписан случайным ключом, и для
 установки придётся сначала удалить старое приложение (данные вернутся

@@ -3,8 +3,9 @@
 # (последний помечен Latest, хранятся 10 последних).
 #
 # Чтобы новые APK ставились поверх уже установленного Cash, они должны быть
-# подписаны тем же ключом. Ключ берётся из секрета ANDROID_DEBUG_KEYSTORE
-# (файл debug.keystore в base64) — см. README, раздел «Збірка в GitHub».
+# подписаны тем же ключом. Ключ (файл debug.keystore в base64) берётся из
+# секрета ANDROID_DEBUG_KEYSTORE, а если его нет — из переменной с тем же
+# именем (вкладка Variables). См. README, раздел «Сборка в GitHub».
 name: build
 
 on:
@@ -26,6 +27,8 @@ jobs:
   android:
     name: Тести та Android
     runs-on: ubuntu-latest
+    outputs:
+      key_sha256: ${{ steps.key.outputs.sha256 }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
@@ -44,20 +47,37 @@ jobs:
       - name: Тести
         run: scripts/ci-run.sh "Тести" flutter test --reporter expanded
       - name: Ключ підпису APK
+        id: key
         env:
-          KEYSTORE: ${{ secrets.ANDROID_DEBUG_KEYSTORE }}
+          KEY_SECRET: ${{ secrets.ANDROID_DEBUG_KEYSTORE }}
+          KEY_VAR: ${{ vars.ANDROID_DEBUG_KEYSTORE }}
         run: |
-          if [ -n "$KEYSTORE" ]; then
-            mkdir -p ~/.android
-            echo "$KEYSTORE" | base64 -d > ~/.android/debug.keystore
-            echo "Підпис: ключ із секрету ANDROID_DEBUG_KEYSTORE"
+          if [ -n "$KEY_SECRET" ]; then
+            src='секрету ANDROID_DEBUG_KEYSTORE'; key="$KEY_SECRET"
+          elif [ -n "$KEY_VAR" ]; then
+            src='змінної ANDROID_DEBUG_KEYSTORE (Variables)'; key="$KEY_VAR"
           else
-            echo "::warning::Секрет ANDROID_DEBUG_KEYSTORE не задано — APK підписано тимчасовим ключем і поверх установленого Cash він не встановиться (див. README)."
+            echo "::warning title=Ключ підпису::Ні секрету, ні змінної ANDROID_DEBUG_KEYSTORE для GitHub Actions у цьому репозиторії не видно — APK підписано тимчасовим ключем і поверх установленого Cash він не встановиться. Секрет має бути в Settings → Secrets and variables → Actions → Repository secrets (не Codespaces, не Dependabot, не Environment)."
+            exit 0
           fi
+          mkdir -p ~/.android
+          if ! printf '%s' "$key" | tr -d ' \r\n\t' | base64 -d > ~/.android/debug.keystore 2>/dev/null; then
+            echo "::error title=Ключ підпису::Значення з $src — не base64. Скопіюйте ключ командою з README ще раз."
+            exit 1
+          fi
+          fp=$(keytool -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey 2>/dev/null | awk '/SHA256:/ {print $2; exit}')
+          if [ -z "$fp" ]; then
+            echo "::error title=Ключ підпису::Ключ із $src не відкривається як debug.keystore (пароль android, alias androiddebugkey)."
+            exit 1
+          fi
+          echo "sha256=$fp" >> "$GITHUB_OUTPUT"
+          echo "::notice title=Ключ підпису::APK підписується ключем із $src, SHA-256 $fp"
       - name: Збірка APK
         run: |
           scripts/ci-run.sh "Збірка APK" flutter build apk --release --build-name=${{ env.VERSION }} --build-number=${{ github.run_number }}
           cp build/app/outputs/flutter-apk/app-release.apk Cash-${{ env.VERSION }}.apk
+          echo "Підпис зібраного APK:"
+          python3 scripts/apk_cert.py Cash-${{ env.VERSION }}.apk
       - uses: actions/upload-artifact@v4
         with:
           name: Cash-android
@@ -111,7 +131,7 @@ jobs:
       - name: Публікація
         env:
           GH_TOKEN: ${{ github.token }}
-          SIGNED: ${{ secrets.ANDROID_DEBUG_KEYSTORE != '' }}
+          KEY_SHA256: ${{ needs.android.outputs.key_sha256 }}
         run: |
           set -euo pipefail
           {
@@ -119,9 +139,11 @@ jobs:
             echo
             echo "- **Android:** \`Cash-${VERSION}.apk\` — скачайте на телефон і встановіть."
             echo "- **Windows:** \`Cash-windows-${VERSION}.zip\` — розпакуйте й запустіть \`Cash-windows\\cash.exe\`."
-            if [ "$SIGNED" != "true" ]; then
-              echo
-              echo "> ⚠️ APK підписано тимчасовим ключем: поверх уже встановленого Cash він не встановиться. Як це виправити — README, розділ «Збірка в GitHub»."
+            echo
+            if [ -n "$KEY_SHA256" ]; then
+              echo "Підпис APK (SHA-256): \`${KEY_SHA256}\`"
+            else
+              echo "> ⚠️ APK підписано тимчасовим ключем: поверх уже встановленого Cash він не встановиться. Як це виправити — README, розділ «Сборка в GitHub»."
             fi
           } > notes.md
           gh release create "v${VERSION}" out/* --target "$GITHUB_SHA" --title "Cash ${VERSION}" --notes-file notes.md --latest
