@@ -71,13 +71,23 @@ jobs:
             exit 1
           fi
           echo "sha256=$fp" >> "$GITHUB_OUTPUT"
+          # Android Gradle Plugin ищет debug.keystore в $ANDROID_USER_HOME
+          # (раньше всех других мест) — указываем явно.
+          echo "ANDROID_USER_HOME=$HOME/.android" >> "$GITHUB_ENV"
+          echo "KEY_SHA256=$fp" >> "$GITHUB_ENV"
+          echo "Змінні Android на раннері:"; env | grep -E '^ANDROID_(USER_HOME|PREFS_ROOT|SDK_HOME|EMULATOR_HOME)=' || true
           echo "::notice title=Ключ підпису::APK підписується ключем із $src, SHA-256 $fp"
       - name: Збірка APK
         run: |
           scripts/ci-run.sh "Збірка APK" flutter build apk --release --build-name=${{ env.VERSION }} --build-number=${{ github.run_number }}
           cp build/app/outputs/flutter-apk/app-release.apk Cash-${{ env.VERSION }}.apk
-          echo "Підпис зібраного APK:"
-          python3 scripts/apk_cert.py Cash-${{ env.VERSION }}.apk
+          apk_fp=$(python3 scripts/apk_cert.py Cash-${{ env.VERSION }}.apk | awk '{print $2}')
+          echo "Підпис зібраного APK: $apk_fp"
+          if [ -n "${KEY_SHA256:-}" ] && [ "$apk_fp" != "$KEY_SHA256" ]; then
+            found=$(find "$HOME" /usr/local/lib/android -name debug.keystore 2>/dev/null | tr '\n' ' ')
+            echo "::error title=Ключ підпису::APK підписано не тим ключем: $apk_fp замість $KEY_SHA256. Знайдені debug.keystore: $found"
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: Cash-android
