@@ -11,11 +11,12 @@
      и не может заменять файлы. Оба доступа действуют только в текущей сессии.
   2. Проверить, что рабочая копия чистая (`git -c safe.directory=* status`
      через `device_bash`, папка — `$HOME/mnt/Cash`).
-  3. После push: в облаке `git bundle create <outputs>/cash-update.bundle
-     <старый HEAD ПК>..origin/main`, `device_commit_files` → `dist\cash-update.bundle`,
+  3. После push: в облаке `git bundle create <outputs>/cash-update-<sha>.bundle
+     <старый HEAD ПК>..origin/main`, `device_commit_files` → `dist\cash-update-<sha>.bundle`,
      на ПК `git fetch <bundle> refs/remotes/origin/main:refs/remotes/origin/main`
-     и `git merge --ff-only origin/main`, затем удалить bundle. Сеть и учётные
-     данные GitHub на ПК для этого не нужны.
+     и `git merge --ff-only origin/main`, затем удалить bundle. Имя файла каждый
+     раз новое (с хэшем коммита): файл с повторным именем ПК может видеть в
+     старой версии. Сеть и учётные данные GitHub на ПК для этого не нужны.
   Если ПК недоступен (выключен, не открыто приложение Claude) — только push,
   а пользователю напомнить сделать `git pull` в этой папке.
 - Сборка и тесты — GitHub Actions (`.github/workflows/build.yml`): каждый push
