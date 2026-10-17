@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import '../logic/credits.dart';
 import '../logic/utilities.dart';
 import '../util/format.dart';
+import 'backup.dart';
 import 'hlc.dart';
 import 'models.dart';
 import 'record.dart';
@@ -115,11 +116,12 @@ class LocalSettings {
 /// Объём данных у личного бюджета небольшой (сотни–тысячи записей в год),
 /// поэтому одного файла достаточно; запись идёт атомарно через временный файл.
 class Store extends ChangeNotifier {
-  Store._(this._file);
+  Store._(this._file, [this._backupDirOverride]);
 
-  /// Хранилище без файла — для тестов.
-  factory Store.inMemory({String deviceId = 'test'}) {
-    final s = Store._(null);
+  /// Хранилище без файла — для тестов. [backupDir] — куда писать автокопии
+  /// (null — автокопии не пишутся).
+  factory Store.inMemory({String deviceId = 'test', Directory? backupDir}) {
+    final s = Store._(null, backupDir);
     s._deviceId = deviceId;
     s._hlc = Hlc(deviceId);
     s.settings.deviceName = deviceId;
@@ -140,6 +142,7 @@ class Store extends ChangeNotifier {
   }
 
   final File? _file;
+  final Directory? _backupDirOverride;
   late String _deviceId;
   late Hlc _hlc;
   int _seq = 0;
@@ -197,6 +200,9 @@ class Store extends ChangeNotifier {
       counter: h is Map ? (h['c'] as num?)?.toInt() ?? 0 : 0,
     );
     _seq = (json['seq'] as num?)?.toInt() ?? 0;
+    _epoch = json['epoch'] is String ? json['epoch'] as String : '';
+    _epochInfo = EpochInfo.tryFromJson(json['epochInfo']);
+    _replaceNotice = ReplaceNotice.tryFromJson(json['replaceNotice']);
     settings.load(json['settings']);
     if (settings.deviceName.isEmpty) settings.deviceName = _defaultDeviceName();
     final recs = json['records'];
@@ -266,6 +272,9 @@ class Store extends ChangeNotifier {
         'deviceId': _deviceId,
         'seq': _seq,
         'hlc': {'m': _hlc.millis, 'c': _hlc.counter},
+        'epoch': _epoch,
+        if (_epochInfo != null) 'epochInfo': _epochInfo!.toJson(),
+        if (_replaceNotice != null) 'replaceNotice': _replaceNotice!.toJson(),
         'settings': settings.toJson(),
         'records': _records.values.map((r) => r.toJson(withSeq: true)).toList(),
       };
@@ -398,6 +407,165 @@ class Store extends ChangeNotifier {
     }
     if (n > 0) _changed(local: false);
     return n;
+  }
+
+  // ------------------------------------------------------- резервные копии
+
+  /// «Поколение» данных. Меняется, когда на устройстве восстанавливают
+  /// резервную копию. При синхронизации данные с более новым поколением
+  /// полностью заменяют данные со старым (а не сливаются с ними), поэтому
+  /// восстановленная копия имеет приоритет на всех устройствах.
+  /// Это HLC-метка восстановления: строки сравниваются, '' — исходное поколение.
+  String _epoch = '';
+  EpochInfo? _epochInfo;
+  ReplaceNotice? _replaceNotice;
+
+  String get epoch => _epoch;
+
+  /// Где и когда восстановили копию, с которой начались текущие данные.
+  EpochInfo? get epochInfo => _epochInfo;
+
+  /// Данные заменены копией с другого устройства — показать пользователю.
+  ReplaceNotice? get replaceNotice => _replaceNotice;
+
+  void clearReplaceNotice() {
+    if (_replaceNotice == null) return;
+    _replaceNotice = null;
+    saveSettings();
+  }
+
+  /// Сколько автокопий хранить (старые удаляются).
+  static const maxAutoBackups = 20;
+
+  /// Папка автокопий (рядом с файлом данных).
+  Directory? get backupDir {
+    final f = _file;
+    if (f == null) return _backupDirOverride;
+    return Directory('${f.parent.path}${Platform.pathSeparator}backups');
+  }
+
+  /// Все живые записи — содержимое резервной копии.
+  List<SyncRecord> snapshot() =>
+      _records.values.where((r) => !r.deleted).toList()..sort((a, b) => a.seq.compareTo(b.seq));
+
+  Backup makeBackup(BackupReason reason) => Backup(
+        createdAt: DateTime.now(),
+        device: settings.deviceName,
+        reason: reason,
+        records: snapshot(),
+      );
+
+  /// Автокопии, новые сверху. Повреждённые файлы пропускаются.
+  Future<List<StoredBackup>> listAutoBackups() async {
+    final dir = backupDir;
+    if (dir == null || !await dir.exists()) return [];
+    final result = <StoredBackup>[];
+    for (final f in await _autoBackupFiles(dir)) {
+      try {
+        result.add(StoredBackup(f, Backup.parse(await f.readAsString())));
+      } catch (e) {
+        debugPrint('Автокопія ${f.path}: $e');
+      }
+    }
+    result.sort((a, b) => b.backup.createdAt.compareTo(a.backup.createdAt));
+    return result;
+  }
+
+  static Future<List<File>> _autoBackupFiles(Directory dir) async {
+    final files = <File>[];
+    await for (final e in dir.list()) {
+      final name = e.uri.pathSegments.isEmpty ? '' : e.uri.pathSegments.last;
+      if (e is File && name.startsWith('auto-') && name.endsWith('.json')) files.add(e);
+    }
+    // В имени — дата и время, поэтому по имени файлы идут по порядку создания.
+    files.sort((a, b) => a.path.compareTo(b.path));
+    return files;
+  }
+
+  /// Сохраняет текущие данные в автокопию перед их заменой.
+  /// Если данных нет или папки для копий нет (тесты) — возвращает null.
+  /// Ошибка записи пробрасывается: тогда данные заменять нельзя.
+  Future<File?> _writeAutoBackup(BackupReason reason) async {
+    final dir = backupDir;
+    final b = makeBackup(reason);
+    if (dir == null || b.records.isEmpty) return null;
+    await dir.create(recursive: true);
+    final base = '${dir.path}${Platform.pathSeparator}auto-${fileStamp(b.createdAt)}';
+    var f = File('$base.json');
+    for (var i = 2; await f.exists(); i++) {
+      f = File('$base-$i.json');
+    }
+    await f.writeAsString(b.encode(), flush: true);
+    try {
+      final all = await _autoBackupFiles(dir);
+      for (var i = 0; i < all.length - maxAutoBackups; i++) {
+        await all[i].delete();
+      }
+    } catch (e) {
+      debugPrint('Очищення автокопій: $e');
+    }
+    return f;
+  }
+
+  /// Заменяет все записи данными [incoming] (новые локальные номера изменений,
+  /// чтобы другие устройства забрали их при следующем обмене).
+  void _replaceRecords(Iterable<SyncRecord> incoming) {
+    _records.clear();
+    for (final r in incoming) {
+      if (r.deleted) continue;
+      _hlc.observe(r.hlc);
+      _records[r.id] = SyncRecord(
+        id: r.id,
+        type: r.type,
+        hlc: r.hlc,
+        data: Map<String, dynamic>.from(r.data),
+        seq: ++_seq,
+      );
+    }
+  }
+
+  /// Восстанавливает данные из резервной копии [b]. Текущие данные сначала
+  /// сохраняются в автокопию (она и возвращается). Начинается новое поколение
+  /// данных — при синхронизации оно заменит данные на других устройствах.
+  Future<File?> importBackup(Backup b) async {
+    await flush();
+    final auto = await _writeAutoBackup(BackupReason.beforeImport);
+    final now = DateTime.now();
+    _epoch = _hlc.now();
+    _epochInfo = EpochInfo(device: settings.deviceName, at: now, backupAt: b.createdAt);
+    _replaceNotice = null;
+    _replaceRecords(b.records);
+    _changed(local: true);
+    await flush();
+    return auto;
+  }
+
+  /// Заменяет данные данными другого устройства, у которого более новое
+  /// поколение (там восстановили резервную копию). Прежние данные сначала
+  /// сохраняются в автокопию. Возвращает локальный номер изменения сразу
+  /// после замены (всё, что после него, — уже новые правки) или null,
+  /// если замена не нужна (поколение не новее текущего).
+  Future<int?> adoptRemote({
+    required String epoch,
+    required EpochInfo? info,
+    required Iterable<SyncRecord> records,
+    required String fromDevice,
+  }) async {
+    if (epoch.compareTo(_epoch) <= 0) return null;
+    await flush();
+    final auto = await _writeAutoBackup(BackupReason.beforeSync);
+    // Пока писалась копия, могла прийти та же замена с другой стороны.
+    if (epoch.compareTo(_epoch) <= 0) return null;
+    _hlc.observe(epoch);
+    final effective = info ?? EpochInfo(device: fromDevice, at: DateTime.now());
+    _epoch = epoch;
+    _epochInfo = effective;
+    _replaceNotice = ReplaceNotice(info: effective, autoBackup: auto?.path);
+    _replaceRecords(records);
+    final upTo = _seq;
+    _changed(local: false);
+    await flush();
+    return upTo;
   }
 
   // ------------------------------------------------------------ запросы

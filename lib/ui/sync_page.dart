@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../sync/sync_service.dart';
 import '../util/format.dart';
 import 'app_scope.dart';
+import 'backup_section.dart';
 import 'common.dart';
 
 /// Вкладка «Синхронизация» — обмен данными с другими устройствами в той же сети.
@@ -154,7 +155,10 @@ class SyncPage extends StatelessWidget {
               '2. На обох задано однаковий код синхронізації.\n'
               '3. Пристрої самі знаходять один одного й обмінюються змінами напряму — '
               'без інтернету й без зовнішніх серверів.\n'
-              '4. Якщо той самий запис змінили на двох пристроях, залишається пізніша зміна.\n\n'
+              '4. Якщо той самий запис змінили на двох пристроях, залишається пізніша зміна.\n'
+              '5. Якщо на одному з пристроїв відновили резервну копію, вона має пріоритет: '
+              'під час синхронізації дані інших пристроїв замінюються нею (попередні дані '
+              'зберігаються в автокопію).\n\n'
               'Windows: під час першого запуску дозвольте застосунку доступ у «Приватних мережах» '
               'у вікні брандмауера. Мережа Wi‑Fi у Windows має бути «Приватною».',
               style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant),
@@ -169,6 +173,8 @@ class SyncPage extends StatelessWidget {
           ],
         );
 
+        final backupCard = BackupCard(store: store);
+
         if (isWide(context)) {
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -177,7 +183,13 @@ class SyncPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: Column(children: [thisDevice, const SizedBox(height: 12), keyCard]),
+                    child: Column(children: [
+                      thisDevice,
+                      const SizedBox(height: 12),
+                      keyCard,
+                      const SizedBox(height: 12),
+                      backupCard,
+                    ]),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -194,6 +206,8 @@ class SyncPage extends StatelessWidget {
             keyCard,
             const SizedBox(height: 12),
             peersCard,
+            const SizedBox(height: 12),
+            backupCard,
             const SizedBox(height: 12),
             thisDevice,
             const SizedBox(height: 12),

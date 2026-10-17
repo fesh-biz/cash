@@ -136,6 +136,13 @@ String fmtDate(DateTime d) => '${_two(d.day)}.${_two(d.month)}.${d.year}';
 /// "13.10"
 String fmtDateShort(DateTime d) => '${_two(d.day)}.${_two(d.month)}';
 
+/// "13.10.2026 16:52"
+String fmtDateTime(DateTime d) => '${fmtDate(d)} ${_two(d.hour)}:${_two(d.minute)}';
+
+/// "2026-10-13_16-52-05" — для имён файлов (сортируется по времени).
+String fileStamp(DateTime d) =>
+    '${dateKey(d)}_${_two(d.hour)}-${_two(d.minute)}-${_two(d.second)}';
+
 /// "Пн"
 String fmtWeekday(DateTime d) => _weekdaysShort[d.weekday - 1];
 

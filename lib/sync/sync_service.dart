@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
+import '../data/backup.dart';
 import '../data/record.dart';
 import '../data/store.dart';
 
@@ -14,7 +15,8 @@ const int kSyncPort = 47800;
 /// UDP-порт для поиска устройств в сети.
 const int kDiscoveryPort = 47801;
 
-const int kProtocol = 1;
+/// 2 — поколения данных (восстановленная резервная копия имеет приоритет).
+const int kProtocol = 2;
 
 /// Допустимое расхождение часов устройств при проверке подписи.
 const Duration kClockTolerance = Duration(hours: 2);
@@ -41,6 +43,9 @@ class Peer {
   /// Во время обмена пришёл запрос на ещё один — повторить после.
   bool _again = false;
 
+  /// Сколько раз подряд обмен прерывался из-за смены поколения данных.
+  int _conflicts = 0;
+
   bool get online => lastSeen != null && DateTime.now().difference(lastSeen!) < const Duration(seconds: 30);
 
   /// Настоящая проблема, о которой стоит предупредить. Недоступность
@@ -58,11 +63,15 @@ class Peer {
 }
 
 class SyncException implements Exception {
-  SyncException(this.message, {this.network = false});
+  SyncException(this.message, {this.network = false, this.conflict = false});
   final String message;
 
   /// Нет связи (а не ошибка кода, часов и т.п.).
   final bool network;
+
+  /// Поколение данных на том устройстве только что сменилось — обмен
+  /// нужно просто повторить, это не ошибка.
+  final bool conflict;
   @override
   String toString() => message;
 }
@@ -90,6 +99,11 @@ String _pathQuery(Uri u) => u.hasQuery ? '${u.path}?${u.query}' : u.path;
 ///   чужое устройство в сети без кода ничего не прочитает и не запишет.
 /// * Обмен — только изменения после последней синхронизации (по курсорам),
 ///   конфликт правок одной записи решается по «последняя правка побеждает».
+/// * Если на одном из устройств восстановили резервную копию, у его данных
+///   более новое «поколение» ([Store.epoch]). Такие данные не сливаются,
+///   а целиком заменяют данные устройства со старым поколением (там перед
+///   заменой делается автокопия). Изменения со старым поколением не
+///   принимаются, чтобы не вернуть в данные то, чего нет в копии.
 class SyncService extends ChangeNotifier {
   SyncService(this.store);
 
@@ -253,6 +267,7 @@ class SyncService extends ChangeNotifier {
       'name': store.settings.deviceName,
       'port': myPort,
       'seq': store.seq,
+      'epoch': store.epoch,
     }));
     for (final t in _broadcastTargets) {
       try {
@@ -278,7 +293,14 @@ class SyncService extends ChangeNotifier {
       final behind = remoteSeq != null && remoteSeq > store.settings.cursorFor(id).pull;
       // Устройство снова в сети после обрыва связи — не ждём паузы между попытками.
       final cameBack = !wasOnline && peer.networkError;
-      if (existing == null || behind || cameBack) unawaited(syncWith(peer, force: cameBack));
+      // Там восстановили резервную копию — забираем её сразу. Если же старое
+      // поколение у того устройства, отправляем ему свои данные (с обычной
+      // паузой после ошибки — вдруг там старая версия приложения).
+      final remoteEpoch = j['epoch'] is String ? j['epoch'] as String : '';
+      final epochCmp = remoteEpoch.compareTo(store.epoch);
+      if (existing == null || behind || cameBack || epochCmp != 0) {
+        unawaited(syncWith(peer, force: cameBack || epochCmp > 0));
+      }
     } catch (_) {}
   }
 
@@ -327,6 +349,7 @@ class SyncService extends ChangeNotifier {
           'proto': kProtocol,
           'id': store.deviceId,
           'name': store.settings.deviceName,
+          'epoch': store.epoch,
         });
         return;
       }
@@ -375,18 +398,75 @@ class SyncService extends ChangeNotifier {
         await _reply(res, 200, {
           'id': store.deviceId,
           'name': store.settings.deviceName,
+          'epoch': store.epoch,
           'maxSeq': maxSeq,
           'records': records.map((r) => r.toJson()).toList(),
         }, key: key, reqSig: sig);
         return;
       }
 
+      // Все данные целиком — для устройства со старым поколением данных.
+      if (req.method == 'GET' && path == '/cash/snapshot') {
+        final maxSeq = store.seq;
+        await _reply(res, 200, {
+          'id': store.deviceId,
+          'name': store.settings.deviceName,
+          'epoch': store.epoch,
+          'epochInfo': store.epochInfo?.toJson(),
+          'maxSeq': maxSeq,
+          'records': store.snapshot().map((r) => r.toJson()).toList(),
+        }, key: key, reqSig: sig);
+        return;
+      }
+
       if (req.method == 'POST' && path == '/cash/changes') {
         final j = jsonDecode(body);
+        // Изменения из другого поколения данных не принимаем: устройство
+        // со старым поколением сначала должно получить восстановленную копию.
+        final epoch = (j is Map && j['epoch'] is String) ? j['epoch'] as String : '';
+        if (epoch != store.epoch) {
+          await _reply(res, 409, {'error': 'epoch', 'epoch': store.epoch}, key: key, reqSig: sig);
+          return;
+        }
         final list = (j is Map && j['records'] is List) ? j['records'] as List : const [];
         final records = list.map(SyncRecord.tryFromJson).whereType<SyncRecord>().toList();
         final merged = store.mergeRemote(records);
         await _reply(res, 200, {'merged': merged}, key: key, reqSig: sig);
+        return;
+      }
+
+      // Устройство, где восстановили резервную копию, присылает все данные:
+      // они заменяют наши, если их поколение новее.
+      if (req.method == 'POST' && path == '/cash/replace') {
+        final j = jsonDecode(body);
+        if (j is! Map) {
+          await _reply(res, 400, {'error': 'bad_request'}, key: key, reqSig: sig);
+          return;
+        }
+        final epoch = j['epoch'] is String ? j['epoch'] as String : '';
+        final list = j['records'] is List ? j['records'] as List : const [];
+        int? upTo;
+        try {
+          upTo = await store.adoptRemote(
+            epoch: epoch,
+            info: EpochInfo.tryFromJson(j['epochInfo']),
+            records: list.map(SyncRecord.tryFromJson).whereType<SyncRecord>().toList(),
+            fromDevice: peerName,
+          );
+        } catch (e) {
+          debugPrint('replace: $e');
+          await _reply(res, 500, {'error': 'backup'}, key: key, reqSig: sig);
+          return;
+        }
+        if (upTo == null) {
+          // Поколение не новее нашего (или замену уже сделали) — пусть то
+          // устройство просто повторит обмен.
+          await _reply(res, 409, {'error': 'epoch', 'epoch': store.epoch}, key: key, reqSig: sig);
+          return;
+        }
+        // maxSeq — номер сразу после замены: правки, сделанные здесь позже,
+        // то устройство заберёт обычным обменом.
+        await _reply(res, 200, {'epoch': store.epoch, 'maxSeq': upTo}, key: key, reqSig: sig);
         return;
       }
 
@@ -457,6 +537,15 @@ class SyncService extends ChangeNotifier {
           default:
             throw SyncException('Код синхронізації не збігається');
         }
+      }
+      if (res.statusCode == 409 && json['error'] == 'epoch') {
+        throw SyncException('Дані на «${p.name}» щойно замінено — повторюю обмін', conflict: true);
+      }
+      if (res.statusCode == 404) {
+        throw SyncException('На «${p.name}» стара версія Cash — оновіть застосунок');
+      }
+      if (res.statusCode == 500 && json['error'] == 'backup') {
+        throw SyncException('На «${p.name}» не вдалося зберегти автокопію — дані там не замінено');
       }
       if (res.statusCode != 200) {
         throw SyncException('Помилка ${res.statusCode} на «${p.name}»');
@@ -565,26 +654,47 @@ class SyncService extends ChangeNotifier {
         data = await _call(p, 'GET', '/cash/changes?since=0');
         maxSeq = (data['maxSeq'] as num?)?.toInt() ?? 0;
       }
-      final list = data['records'] is List ? data['records'] as List : const [];
-      store.mergeRemote(list.map(SyncRecord.tryFromJson).whereType<SyncRecord>());
-      cur.pull = maxSeq;
+      // Поколения данных разные: на одном из устройств восстановили резервную
+      // копию. Новое поколение целиком заменяет старое, без слияния.
+      final remoteEpoch = data['epoch'] is String ? data['epoch'] as String : '';
+      final epochCmp = remoteEpoch.compareTo(store.epoch);
+      if (epochCmp > 0) {
+        await _adoptFrom(p, cur);
+      } else if (epochCmp < 0) {
+        await _replaceOn(p, cur);
+      } else {
+        final list = data['records'] is List ? data['records'] as List : const [];
+        store.mergeRemote(list.map(SyncRecord.tryFromJson).whereType<SyncRecord>());
+        cur.pull = maxSeq;
 
-      // 2. Отправляем свои изменения.
-      final upTo = store.seq;
-      final out = store.changesSince(cur.push, upTo: upTo);
-      if (out.isNotEmpty) {
-        await _call(p, 'POST', '/cash/changes',
-            body: jsonEncode({'records': out.map((r) => r.toJson()).toList()}));
+        // 2. Отправляем свои изменения.
+        final upTo = store.seq;
+        final out = store.changesSince(cur.push, upTo: upTo);
+        if (out.isNotEmpty) {
+          await _call(p, 'POST', '/cash/changes',
+              body: jsonEncode({
+                'epoch': store.epoch,
+                'records': out.map((r) => r.toJson()).toList(),
+              }));
+        }
+        cur.push = upTo;
       }
-      cur.push = upTo;
 
       final now = DateTime.now();
       p._ok(now);
+      p._conflicts = 0;
       store.settings.knownPeers[p.id]?.lastSync = now.millisecondsSinceEpoch;
       store.saveSettings(notify: false);
     } catch (e) {
+      if (e is SyncException && e.conflict && p._conflicts < 3) {
+        // Данные там только что заменили — просто повторяем обмен.
+        p._conflicts++;
+        p._again = true;
+        return;
+      }
       p.error = e is SyncException ? e.message : '$e';
       p.networkError = e is SyncException && e.network;
+      p._conflicts = 0;
       // Недоступное устройство не дёргаем каждые 20 секунд. Если оно при этом
       // в сети (присылает о себе сигналы), пробуем почаще.
       final pause = p.networkError && p.online ? const Duration(seconds: 15) : const Duration(minutes: 1);
@@ -597,5 +707,50 @@ class SyncService extends ChangeNotifier {
         unawaited(syncWith(p));
       }
     }
+  }
+
+  /// У того устройства более новое поколение данных: забираем все его данные
+  /// и заменяем ими свои (свои перед этим уходят в автокопию).
+  Future<void> _adoptFrom(Peer p, PeerCursor cur) async {
+    final snap = await _call(p, 'GET', '/cash/snapshot');
+    if (snap['id'] != p.id) {
+      throw SyncException('За адресою ${p.host} тепер інший пристрій');
+    }
+    final epoch = snap['epoch'] is String ? snap['epoch'] as String : '';
+    final list = snap['records'] is List ? snap['records'] as List : const [];
+    int? upTo;
+    try {
+      upTo = await store.adoptRemote(
+        epoch: epoch,
+        info: EpochInfo.tryFromJson(snap['epochInfo']),
+        records: list.map(SyncRecord.tryFromJson).whereType<SyncRecord>().toList(),
+        fromDevice: p.name,
+      );
+    } on FileSystemException catch (e) {
+      throw SyncException('Не вдалося зберегти автокопію, дані не замінено: ${e.message}');
+    }
+    if (upTo == null) {
+      // Пока шёл запрос, поколение уже сменилось — повторяем обмен.
+      throw SyncException('Дані щойно змінилися — повторюю обмін', conflict: true);
+    }
+    // Теперь у нас те же данные, что у того устройства на момент снимка.
+    cur
+      ..pull = (snap['maxSeq'] as num?)?.toInt() ?? 0
+      ..push = upTo;
+  }
+
+  /// У того устройства старое поколение данных: отправляем ему все свои
+  /// данные, они заменят его данные (там перед этим делается автокопия).
+  Future<void> _replaceOn(Peer p, PeerCursor cur) async {
+    final upTo = store.seq;
+    final res = await _call(p, 'POST', '/cash/replace',
+        body: jsonEncode({
+          'epoch': store.epoch,
+          'epochInfo': store.epochInfo?.toJson(),
+          'records': store.snapshot().map((r) => r.toJson()).toList(),
+        }));
+    cur
+      ..pull = (res['maxSeq'] as num?)?.toInt() ?? cur.pull
+      ..push = upTo;
   }
 }

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/models.dart';
+import '../data/store.dart';
 import '../util/format.dart';
 import 'app_scope.dart';
+import 'backup_section.dart';
 import 'credits_page.dart';
 import 'expense_editor.dart';
 import 'overview_page.dart';
@@ -37,6 +39,27 @@ class _HomeShellState extends State<HomeShell> {
 
   void _selectPeriod(String? id) => setState(() => _periodId = id);
 
+  bool _noticeOpen = false;
+
+  /// Данные заменены при синхронизации копией с другого устройства —
+  /// сообщаем об этом один раз.
+  void _maybeShowReplaceNotice(Store store) {
+    final n = store.replaceNotice;
+    if (n == null || _noticeOpen) return;
+    _noticeOpen = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        _noticeOpen = false;
+        return;
+      }
+      await showReplaceNotice(context, n);
+      if (identical(store.replaceNotice, n)) store.clearReplaceNotice();
+      _noticeOpen = false;
+      // Пока окно было открыто, могла прийти ещё одна замена.
+      if (mounted) _maybeShowReplaceNotice(store);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
@@ -48,6 +71,7 @@ class _HomeShellState extends State<HomeShell> {
         final period = store.periodById(_periodId) ?? store.defaultPeriod(now);
         final isCurrent = period != null && period.contains(now);
         final utilitiesDue = _utilitiesDue(now);
+        _maybeShowReplaceNotice(store);
 
         // Значок вкладки; на «Коммуналке» — точка, когда пора снять показания.
         Widget navIcon(int i, {required bool selected}) {
