@@ -2,15 +2,14 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show PlatformException;
 
 import '../data/backup.dart';
 import '../data/store.dart';
+import '../util/file_dialogs.dart';
 import '../util/format.dart';
 import 'common.dart';
-
-bool get _isMobile => Platform.isAndroid || Platform.isIOS;
 
 String _recordsStr(int n) => '$n ${plural(n, 'запис', 'записи', 'записів')}';
 
@@ -62,60 +61,33 @@ class BackupCard extends StatelessWidget {
     final bytes = Uint8List.fromList(utf8.encode(b.encode()));
     final name = 'cash-backup-${fileStamp(b.createdAt)}.json';
     try {
-      String? path;
-      if (_isMobile) {
-        // На телефоне файл записывает система (выбор папки или облака).
-        path = await FilePicker.saveFile(
-          dialogTitle: 'Зберегти резервну копію',
-          fileName: name,
-          bytes: bytes,
-        );
-      } else {
-        path = await FilePicker.saveFile(
-          dialogTitle: 'Зберегти резервну копію',
-          fileName: name,
-          type: FileType.custom,
-          allowedExtensions: const ['json'],
-        );
-        if (path != null) {
-          if (!path.toLowerCase().endsWith('.json')) path = '$path.json';
-          await File(path).writeAsBytes(bytes, flush: true);
-        }
-      }
-      if (path == null) return; // пользователь закрыл окно
+      final saved = await saveFileDialog(name, bytes);
+      if (saved == null) return; // пользователь закрыл окно
       if (context.mounted) {
         showSnack(context, 'Резервну копію збережено (${_recordsStr(b.records.length)})');
       }
     } catch (e) {
-      if (context.mounted) showSnack(context, 'Не вдалося зберегти копію: $e');
+      if (context.mounted) showSnack(context, 'Не вдалося зберегти копію: ${_errorText(e)}');
     }
   }
 
   Future<void> _import(BuildContext context) async {
     Backup b;
     try {
-      final res = await FilePicker.pickFiles(
-        dialogTitle: 'Виберіть файл резервної копії',
-        // На Android фильтр по расширению ненадёжен — показываем все файлы.
-        type: _isMobile ? FileType.any : FileType.custom,
-        allowedExtensions: _isMobile ? null : const ['json'],
-        withData: true,
-      );
-      if (res == null || res.files.isEmpty) return;
-      final f = res.files.single;
-      var bytes = f.bytes;
-      if (bytes == null && f.path != null) bytes = await File(f.path!).readAsBytes();
-      if (bytes == null) throw BackupFormatException('Не вдалося прочитати файл');
+      final bytes = await openFileDialog();
+      if (bytes == null) return; // пользователь закрыл окно
       b = Backup.parse(utf8.decode(bytes, allowMalformed: true));
     } on BackupFormatException catch (e) {
       if (context.mounted) showSnack(context, e.message);
       return;
     } catch (e) {
-      if (context.mounted) showSnack(context, 'Не вдалося відкрити файл: $e');
+      if (context.mounted) showSnack(context, 'Не вдалося відкрити файл: ${_errorText(e)}');
       return;
     }
     if (context.mounted) await _restore(context, b);
   }
+
+  static String _errorText(Object e) => e is PlatformException ? (e.message ?? e.code) : '$e';
 
   Future<void> _showAutoBackups(BuildContext context) async {
     List<StoredBackup> list;
