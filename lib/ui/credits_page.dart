@@ -189,6 +189,7 @@ class CreditsPage extends StatelessWidget {
       order: order,
       payments: r.payments,
       firstDate: r.firstDate,
+      firstPaid: r.firstPaid,
       key: c?.key,
     ));
   }
@@ -314,12 +315,20 @@ class _CreditTile extends StatelessWidget {
 // ---------------------------------------------------------------- диалог кредита
 
 class _CreditEdit {
-  _CreditEdit({required this.name, required this.amount, this.payments, this.firstDate, this.delete = false});
+  _CreditEdit({
+    required this.name,
+    required this.amount,
+    this.payments,
+    this.firstDate,
+    this.firstPaid = false,
+    this.delete = false,
+  });
 
   final String name;
   final double amount;
   final int? payments;
   final DateTime? firstDate;
+  final bool firstPaid;
   final bool delete;
 }
 
@@ -340,6 +349,15 @@ class _CreditDialogState extends State<_CreditDialog> {
       TextEditingController(text: widget.item?.payments?.toString() ?? '');
   late bool _installment = widget.item?.isInstallment ?? false;
   late DateTime _first = widget.item?.firstDate ?? today();
+
+  /// Новый кредит обычно заводят в день оформления, когда первый платёж уже внесён.
+  late bool _firstPaid = widget.item?.firstPaid ?? true;
+
+  /// Галочка «сплачено при оформленні» имеет смысл, только если первый платёж
+  /// сегодня: прошедшие и так выплачены, будущие ещё нет.
+  bool get _firstIsToday => _first == today();
+
+  bool get _firstPaidEffective => _firstPaid && _firstIsToday;
 
   @override
   void initState() {
@@ -374,6 +392,7 @@ class _CreditDialogState extends State<_CreditDialog> {
         amount: a,
         payments: _installment ? _payments : null,
         firstDate: _installment ? _first : null,
+        firstPaid: _installment && _firstPaidEffective,
       ),
     );
   }
@@ -387,6 +406,7 @@ class _CreditDialogState extends State<_CreditDialog> {
     setState(() {
       _count.text = '$total';
       _first = installmentDate(next, -(total - left));
+      _firstPaid = false;
     });
   }
 
@@ -398,7 +418,15 @@ class _CreditDialogState extends State<_CreditDialog> {
     InstallmentInfo? info;
     if (_installment && a != null && n != null) {
       info = InstallmentInfo.of(
-        CreditItem(id: '', periodId: '', name: '', amount: a, payments: n, firstDate: _first),
+        CreditItem(
+          id: '',
+          periodId: '',
+          name: '',
+          amount: a,
+          payments: n,
+          firstDate: _first,
+          firstPaid: _firstPaidEffective,
+        ),
         DateTime.now(),
       );
     }
@@ -451,6 +479,14 @@ class _CreditDialogState extends State<_CreditDialog> {
                     if (d != null && mounted) setState(() => _first = d);
                   },
                 ),
+                if (_firstIsToday)
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    title: const Text('Перший платіж сплачено при оформленні'),
+                    value: _firstPaid,
+                    onChanged: (v) => setState(() => _firstPaid = v ?? false),
+                  ),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: TextButton(

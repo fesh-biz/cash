@@ -231,6 +231,7 @@ class CreditItem {
     this.order = 0,
     this.payments,
     this.firstDate,
+    this.firstPaid = false,
     String? key,
   }) : key = (key == null || key.isEmpty) ? id : key;
 
@@ -247,6 +248,10 @@ class CreditItem {
 
   /// Дата первого платежа (для рассрочки).
   final DateTime? firstDate;
+
+  /// Первый платёж внесён при оформлении — в день первого платежа он уже
+  /// считается выплаченным (обычно в день платежа он ещё предстоящий).
+  final bool firstPaid;
 
   /// Общий ключ копий одного кредита в разных периодах.
   final String key;
@@ -268,6 +273,7 @@ class CreditItem {
         order: order ?? this.order,
         payments: payments,
         firstDate: firstDate,
+        firstPaid: firstPaid,
         key: key,
       );
 
@@ -281,6 +287,7 @@ class CreditItem {
       order: _i(r.data['order']),
       payments: p > 0 ? p : null,
       firstDate: tryParseDateKey(r.data['firstDate']),
+      firstPaid: r.data['firstPaid'] == true,
       key: _s(r.data['key']),
     );
   }
@@ -293,6 +300,7 @@ class CreditItem {
         'key': key,
         if (payments != null) 'payments': payments,
         if (firstDate != null) 'firstDate': dateKey(firstDate!),
+        if (firstPaid) 'firstPaid': true,
       };
 }
 

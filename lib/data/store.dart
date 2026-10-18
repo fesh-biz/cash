@@ -850,6 +850,7 @@ class Store extends ChangeNotifier {
             order: later.order,
             payments: c.payments,
             firstDate: c.firstDate,
+            firstPaid: c.firstPaid,
             key: c.key,
           ).toData(),
         );

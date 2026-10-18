@@ -1,4 +1,5 @@
 import 'package:cash/data/models.dart';
+import 'package:cash/data/record.dart';
 import 'package:cash/data/store.dart';
 import 'package:cash/logic/credits.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -32,6 +33,27 @@ void main() {
     expect(InstallmentInfo.of(installment(), DateTime(2026, 10, 15)).left, 7);
     expect(InstallmentInfo.of(installment(), DateTime(2026, 10, 16)).left, 6);
     expect(InstallmentInfo.of(installment(), DateTime(2027, 5, 1)).finished, isTrue);
+  });
+
+  test('первый платёж, внесённый при оформлении, сразу считается выплаченным', () {
+    final c = CreditItem(
+      id: 'd',
+      periodId: 'p',
+      name: 'Диск',
+      amount: 804,
+      payments: 10,
+      firstDate: DateTime(2026, 10, 18),
+      firstPaid: true,
+    );
+    final i = InstallmentInfo.of(c, DateTime(2026, 10, 18, 22, 15));
+    expect(i.paid, 1);
+    expect(i.left, 9);
+    expect(i.next, DateTime(2026, 11, 18));
+    // Платёж всё равно приходится на текущий период.
+    expect(hasPaymentIn(c, DateTime(2026, 10, 10), DateTime(2026, 11, 9)), isTrue);
+    // Флаг переживает синхронизацию.
+    final back = CreditItem.fromRecord(SyncRecord(id: 'd', type: RecType.credit, hlc: '', data: c.toData()));
+    expect(back.firstPaid, isTrue);
   });
 
   test('платёж в периоде', () {

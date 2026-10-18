@@ -27,7 +27,7 @@ class InstallmentInfo {
     final first = c.firstDate ?? dateOnly(now);
     final t = dateOnly(now);
     var paid = 0;
-    while (paid < n && installmentDate(first, paid).isBefore(t)) {
+    while (paid < n && (installmentDate(first, paid).isBefore(t) || (paid == 0 && c.firstPaid))) {
       paid++;
     }
     return InstallmentInfo._(
@@ -44,7 +44,8 @@ class InstallmentInfo {
   final int total;
 
   /// Сколько платежей уже прошло (дата платежа раньше сегодняшней;
-  /// в день платежа он ещё считается предстоящим).
+  /// в день платежа он ещё считается предстоящим, кроме первого,
+  /// внесённого при оформлении).
   final int paid;
 
   /// Ежемесячный платёж.
