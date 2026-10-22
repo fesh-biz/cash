@@ -637,7 +637,17 @@ class Store extends ChangeNotifier {
 
   // ------------------------------------------------------------ коммуналка
 
-  UtilityConfig get utilityConfig => UtilityConfig.fromRecord(_records[UtilityConfig.id]);
+  /// Настройки коммуналки. Если тарифы или день показаний ещё не сохранены
+  /// в настройках (данные старых версий), они берутся из последних показаний.
+  UtilityConfig get utilityConfig {
+    final r = _records[UtilityConfig.id];
+    final last = meterReadings.lastOrNull;
+    return UtilityConfig.fromRecord(
+      r,
+      fallbackTariffs: last?.tariffs ?? UtilityTariffs.zero,
+      fallbackMeterDay: last?.date.day,
+    );
+  }
 
   void saveUtilityConfig(UtilityConfig c) => put(RecType.utilConfig, UtilityConfig.id, c.toData());
 
@@ -701,7 +711,7 @@ class Store extends ChangeNotifier {
     return UtilityStatus(
       amount: bill?.total ?? plan,
       plan: plan,
-      dueDate: meterDateIn(p),
+      dueDate: meterDateIn(p, utilityConfig.meterDay),
       bill: bill,
       reading: reading,
     );
@@ -744,38 +754,6 @@ class Store extends ChangeNotifier {
       order: raw.isEmpty ? 0 : raw.map((f) => f.order).reduce(max) + 1,
       kind: FixedKind.utilities,
     ));
-  }
-
-  /// Показания из таблицы за 2026 год. Декабрь 2025 — только как база для
-  /// расчёта января. Id по месяцам, поэтому повторная загрузка (в т.ч. на
-  /// втором устройстве) не создаёт дублей.
-  void importMeterHistory() {
-    const rows = [
-      // год, месяц, ванна, кухня, эл, отопление
-      (2025, 12, 665.0, 78.0, 26381.0, 0.0),
-      (2026, 1, 666.0, 78.0, 26820.0, 2540.0),
-      (2026, 2, 668.0, 79.0, 27075.0, 2500.0),
-      (2026, 3, 670.0, 79.0, 27321.0, 1200.0),
-      (2026, 4, 673.0, 80.0, 27724.0, 0.0),
-      (2026, 5, 675.0, 81.0, 28116.0, 0.0),
-      (2026, 6, 677.0, 81.0, 28383.0, 0.0),
-      (2026, 7, 680.0, 81.0, 28623.0, 0.0),
-      (2026, 8, 683.0, 82.0, 28894.0, 0.0),
-      (2026, 9, 685.0, 82.0, 29154.0, 0.0),
-    ];
-    batch(() {
-      for (final (y, mo, bath, kitchen, el, heating) in rows) {
-        final m = MeterReading(
-          date: DateTime(y, mo, meterDay),
-          bath: bath,
-          kitchen: kitchen,
-          el: el,
-          heating: heating,
-          tariffs: UtilityTariffs.initial,
-        );
-        _putQuiet(RecType.meter, m.id, m.toData());
-      }
-    });
   }
 
   List<CreditItem> creditsOf(String periodId) {
@@ -918,37 +896,39 @@ class Store extends ChangeNotifier {
 
   static String periodIdFor(DateTime start) => 'p-${dateKey(start)}';
 
-  /// Первый период: от последнего «дня зарплаты» [payday] до дня перед следующим.
-  Period createFirstPeriod(DateTime now, {int payday = 10}) {
-    final t = dateOnly(now);
-    final start = t.day >= payday ? DateTime(t.year, t.month, payday) : DateTime(t.year, t.month - 1, payday);
-    final end = DateTime(start.year, start.month + 1, start.day - 1);
+  /// Новый период с заданными пользователем датами и доходом.
+  /// Обязательные расходы и кредиты добавляются потом на вкладках.
+  Period createPeriod({
+    required DateTime start,
+    required DateTime end,
+    required double income,
+    required String currency,
+    double rate = 0,
+    double creditPlan = 0,
+  }) {
+    final s = dateOnly(start);
+    var id = periodIdFor(s);
+    // Id по дате начала; если такой уже есть (например, удалённый и
+    // восстановленный), берём уникальный.
+    if (_records[id] != null && !_records[id]!.deleted) id = '$id-${_randomHex(3)}';
     final p = Period(
-      id: periodIdFor(start),
-      start: start,
-      end: end,
-      rate: 51,
-      incomeEur: 740,
-      creditPlan: 10000,
+      id: id,
+      start: s,
+      end: dateOnly(end),
+      income: income,
+      currency: currency,
+      rate: rate,
+      creditPlan: creditPlan,
     );
-    batch(() {
-      _putQuiet(RecType.period, p.id, p.toData());
-      _putQuiet(RecType.fixed, '${p.id}-fx-0',
-          FixedExpense(id: '${p.id}-fx-0', periodId: p.id, name: 'Квартира', amount: 10000, order: 0).toData());
-      _putQuiet(
-          RecType.fixed,
-          '${p.id}-fx-1',
-          FixedExpense(
-            id: '${p.id}-fx-1',
-            periodId: p.id,
-            name: 'Комуналка',
-            amount: utilityConfig.plan ?? 4000,
-            order: 1,
-            kind: FixedKind.utilities,
-          ).toData());
-    });
+    savePeriod(p);
     return p;
   }
+
+  /// Периоды, которые пересекаются с датами [start]–[end] (кроме [exceptId]).
+  List<Period> overlapping(DateTime start, DateTime end, {String? exceptId}) => periods
+      .where((x) => x.id != exceptId)
+      .where((x) => !(end.isBefore(x.start) || start.isAfter(x.end)))
+      .toList();
 
   /// Следующий период с теми же настройками (курс, доход, обязательные
   /// расходы, платежи по кредитам). Внесённые суммы не копируются.
@@ -959,8 +939,9 @@ class Store extends ChangeNotifier {
       id: periodIdFor(start),
       start: start,
       end: end,
+      income: prev.income,
+      currency: prev.currency,
       rate: prev.rate,
-      incomeEur: prev.incomeEur,
       creditPlan: prev.creditPlan,
     );
     batch(() {
@@ -989,52 +970,6 @@ class Store extends ChangeNotifier {
         _putQuiet(RecType.credit, id, c.copyWith(id: id, periodId: p.id, order: i).toData());
         i++;
       }
-    });
-    return p;
-  }
-
-  /// Данные из исходной таблицы (период 10.10.2026 – 09.11.2026)
-  /// и показания счётчиков за 2026 год.
-  /// Id фиксированные, поэтому загрузка на двух устройствах не создаст дублей.
-  Period loadSample() {
-    final start = DateTime(2026, 10, 10);
-    final p = Period(
-      id: periodIdFor(start),
-      start: start,
-      end: DateTime(2026, 11, 9),
-      rate: 51,
-      incomeEur: 740,
-      creditPlan: 10000,
-    );
-    batch(() {
-      _putQuiet(RecType.period, p.id, p.toData());
-      final fixed = [
-        ('Квартира', 10000.0, FixedKind.manual),
-        ('Комуналка', 4000.0, FixedKind.utilities),
-      ];
-      for (var i = 0; i < fixed.length; i++) {
-        final id = '${p.id}-fx-$i';
-        _putQuiet(
-            RecType.fixed,
-            id,
-            FixedExpense(id: id, periodId: p.id, name: fixed[i].$1, amount: fixed[i].$2, order: i, kind: fixed[i].$3)
-                .toData());
-      }
-      final credits = [('Кредит 1', 1850.0), ('Кредит 2', 666.0), ('Кредит 3', 640.0), ('Відсотки', 700.0)];
-      for (var i = 0; i < credits.length; i++) {
-        final id = '${p.id}-cr-$i';
-        _putQuiet(RecType.credit, id,
-            CreditItem(id: id, periodId: p.id, name: credits[i].$1, amount: credits[i].$2, order: i).toData());
-      }
-      _putQuiet(RecType.deposit, '${p.id}-dep-sample',
-          CreditDeposit(id: '${p.id}-dep-sample', periodId: p.id, date: start, amount: 8000).toData());
-      final spent = [(10, 1500.0), (11, 500.0), (12, 500.0), (13, 1750.0)];
-      for (final (day, amount) in spent) {
-        final id = '${p.id}-ex-sample-$day';
-        _putQuiet(RecType.expense, id,
-            Expense(id: id, date: DateTime(2026, 10, day), amount: amount, created: day).toData());
-      }
-      importMeterHistory();
     });
     return p;
   }

@@ -190,6 +190,13 @@ class _ReadingFormState extends State<_ReadingForm> {
               subtitle: const Text('Зараз суму пораховано за тарифами на момент показників'),
             ),
           const SizedBox(height: 16),
+          if (current.isEmpty && (ex == null || _useCurrentTariffs)) ...[
+            Text(
+              'Тарифи ще не задано — сума вийде без них. Вкажіть тарифи на вкладці «Комуналка».',
+              style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.error),
+            ),
+            const SizedBox(height: 8),
+          ],
           if (prev == null)
             Text(
               'Це перші показники — з ними порівнюватимуться наступні. '

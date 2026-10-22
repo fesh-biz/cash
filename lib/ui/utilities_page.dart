@@ -23,14 +23,21 @@ class UtilitiesPage extends StatelessWidget {
     final periodCard = period == null ? null : _PeriodCard(period: period!);
 
     final planCard = SectionCard(
-      title: 'Сума за замовчуванням',
+      title: 'Налаштування',
       children: [
         AmountTile(
-          title: 'План на місяць',
+          title: 'Сума за замовчуванням',
           subtitle: 'Йде в бюджет, доки не внесено показники за період',
           amount: config.plan ?? 0,
           amountText: config.plan == null ? 'не задано' : money(config.plan!),
           onTap: () => editUtilityPlan(context),
+        ),
+        AmountTile(
+          title: 'День зняття показників',
+          subtitle: 'Цього дня з’явиться нагадування внести показники',
+          amount: 0,
+          amountText: config.meterDay == null ? 'не задано' : '${config.meterDay}-го',
+          onTap: () => editMeterDay(context),
         ),
       ],
     );
@@ -45,20 +52,11 @@ class UtilitiesPage extends StatelessWidget {
         onPressed: () => showReadingEditor(context),
       ),
       children: [
-        if (readings.isEmpty) ...[
-          const ListTile(title: Text('Показників поки немає')),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.table_chart_outlined),
-              label: const Text('Перенести показники з таблиці'),
-              onPressed: () {
-                store.importMeterHistory();
-                showSnack(context, 'Перенесено показники за січень–вересень 2026');
-              },
-            ),
+        if (readings.isEmpty)
+          const ListTile(
+            title: Text('Показників поки немає'),
+            subtitle: Text('Перші показники стануть базою: з ними порівнюватимуться наступні'),
           ),
-        ],
         if (readings.isNotEmpty)
           _ReadingsList(rows: [for (final m in readings.reversed) (m, store.billFor(m))]),
       ],
@@ -110,11 +108,30 @@ Future<void> editUtilityPlan(BuildContext context) async {
     context,
     title: 'Комуналка за замовчуванням',
     initial: current,
-    help: 'Ця сума стоїть у бюджеті періоду, доки не внесено показники лічильників (28-го). '
-        'Діє, доки ви її не зміните. Влітку зазвичай близько 2 000 ₴, '
-        'в опалювальний сезон — 4–5 тис.',
+    help: 'Ця сума стоїть у бюджеті періоду, доки не внесено показники лічильників. '
+        'Діє, доки ви її не зміните (наприклад, на опалювальний сезон).',
   );
   if (v != null) store.saveUtilityConfig(config.copyWith(plan: v));
+}
+
+/// Изменить день месяца, когда снимаются показания.
+Future<void> editMeterDay(BuildContext context) async {
+  final store = AppScope.of(context).store;
+  final config = store.utilityConfig;
+  final v = await showNumberDialog(
+    context,
+    title: 'День зняття показників',
+    initial: (config.meterDay ?? 0).toDouble(),
+    suffix: '-го',
+    help: 'Число місяця від 1 до 31. Якщо в місяці менше днів — береться останній день.',
+  );
+  if (v == null) return;
+  final day = v.round();
+  if (day < 1 || day > 31 || day != v) {
+    if (context.mounted) showSnack(context, 'Вкажіть число від 1 до 31');
+    return;
+  }
+  store.saveUtilityConfig(config.copyWith(meterDay: day));
 }
 
 /// Коммуналка в выбранном периоде: факт или план.
@@ -162,8 +179,10 @@ class _PeriodCard extends StatelessWidget {
       status = 'План. Час зняти показники (${fmtDayLong(due)})';
     } else if (due != null) {
       status = 'План, доки не внесено показники ${fmtDayLong(due)}';
+    } else if (store.utilityConfig.meterDay == null) {
+      status = 'План. День зняття показників не задано';
     } else {
-      status = 'План: у періоді немає 28-го числа';
+      status = 'План: у періоді немає ${store.utilityConfig.meterDay}-го числа';
     }
 
     final fg = s.isActual ? t.colorScheme.onPrimaryContainer : t.colorScheme.onSurface;
@@ -228,8 +247,8 @@ class _PeriodCard extends StatelessWidget {
     );
   }
 
-  /// Дата по умолчанию: сегодня, если 28-е уже наступило или идёт другой
-  /// период, иначе само 28-е число периода.
+  /// Дата по умолчанию: сегодня, если день показаний уже наступил или идёт
+  /// другой период, иначе сам день показаний в периоде.
   static DateTime _suggestDate(DateTime? due, DateTime now) {
     final t = dateOnly(now);
     if (due == null) return t;
@@ -443,6 +462,14 @@ class _TariffsCard extends StatelessWidget {
         tile('Водовідведення, за 1 м³', tr.cubeOut, '₴', (v) => tr.copyWith(cubeOut: v)),
         tile('Електроенергія, за 1 кВт·год', tr.kwh, '₴', (v) => tr.copyWith(kwh: v)),
         tile('Абонплата ЖКГ', tr.housing, '₴', (v) => tr.copyWith(housing: v)),
+        if (tr.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Text(
+              'Тарифи ще не задано — вкажіть їх, щоб комуналка рахувалася за показниками.',
+              style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.error),
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
           child: Text(

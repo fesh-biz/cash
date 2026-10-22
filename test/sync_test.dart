@@ -4,6 +4,8 @@ import 'package:cash/sync/sync_service.dart';
 import 'package:cash/util/format.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'sample_data.dart';
+
 /// Две копии приложения синхронизируются через настоящий HTTP на 127.0.0.1.
 void main() {
   late Store a, b;
@@ -28,7 +30,7 @@ void main() {
   });
 
   test('данные переходят в обе стороны', () async {
-    a.loadSample();
+    loadSample(a);
     b.addExpense(DateTime(2026, 10, 14), 300, 'кофе');
 
     final err = await sa.addManual('127.0.0.1:${sb.port}');

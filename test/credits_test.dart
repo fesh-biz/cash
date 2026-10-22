@@ -4,6 +4,8 @@ import 'package:cash/data/store.dart';
 import 'package:cash/logic/credits.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'sample_data.dart';
+
 void main() {
   CreditItem installment({int payments = 12, DateTime? first, double amount = 1850}) => CreditItem(
         id: 'c1',
@@ -64,7 +66,7 @@ void main() {
 
   test('правки и удаление переходят в следующие периоды, выплаченное не копируется', () {
     final store = Store.inMemory();
-    final oct = store.loadSample();
+    final oct = loadSample(store);
     store.saveCredit(CreditItem(
       id: 'inst',
       periodId: oct.id,

@@ -3,13 +3,15 @@ import 'package:cash/data/store.dart';
 import 'package:cash/logic/budget.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'sample_data.dart';
+
 /// Коммуналка: расчёт совпадает с таблицей счётчиков, план → факт по показаниям.
 void main() {
   late Store store;
 
   setUp(() {
     store = Store.inMemory();
-    store.loadSample(); // период 10.10–09.11.2026 + показания 12.2025–09.2026
+    loadSample(store); // период 10.10–09.11.2026 + показания 12.2025–09.2026
   });
 
   Period oct() => store.periods.single;

@@ -183,7 +183,7 @@ class _HomeShellState extends State<HomeShell> {
 
   static const _utilitiesTab = 3;
 
-  /// В текущем периоде наступило 28-е, а показаний ещё нет.
+  /// В текущем периоде наступил день показаний, а показаний ещё нет.
   bool _utilitiesDue(DateTime now) {
     final store = AppScope.of(context).store;
     final p = store.periodFor(now);

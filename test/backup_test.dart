@@ -5,13 +5,15 @@ import 'package:cash/data/store.dart';
 import 'package:cash/sync/sync_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'sample_data.dart';
+
 void main() {
   final day = DateTime(2026, 10, 14);
 
   group('резервная копия', () {
     test('файл копии читается обратно, чужой файл — нет', () {
       final s = Store.inMemory(deviceId: 'aaaa');
-      s.loadSample();
+      loadSample(s);
       final b = Backup.parse(s.makeBackup(BackupReason.manual).encode());
       expect(b.records.length, s.snapshot().length);
       expect(b.reason, BackupReason.manual);
@@ -24,7 +26,7 @@ void main() {
       final dir = await Directory.systemTemp.createTemp('cash-test');
       addTearDown(() => dir.delete(recursive: true));
       final s = Store.inMemory(deviceId: 'aaaa', backupDir: dir);
-      s.loadSample();
+      loadSample(s);
       final copy = s.makeBackup(BackupReason.manual);
       s.addExpense(day, 999, 'після копії');
       expect(s.epoch, '');
@@ -65,7 +67,7 @@ void main() {
       sb = SyncService(b);
       await sa.start();
       await sb.start();
-      a.loadSample();
+      loadSample(a);
       expect(await sa.addManual('127.0.0.1:${sb.port}'), isNull);
       expect(b.periods.length, 1);
     });

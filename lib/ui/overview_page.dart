@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../data/models.dart';
 import '../logic/budget.dart';
+import '../util/currency.dart';
 import '../util/format.dart';
 import 'app_scope.dart';
 import 'common.dart';
 import 'expense_editor.dart';
+import 'period_form.dart';
 import 'reading_editor.dart';
 
 /// Вкладка «Бюджет»: главное число дня, сводка и таблица по дням.
@@ -295,7 +297,7 @@ class _Stats extends StatelessWidget {
         StatTile(
           label: 'Дохід',
           value: money(p.incomeUah),
-          hint: '${numStr(p.incomeEur)} € × ${numStr(p.rate)}',
+          hint: p.isUahIncome ? null : '${numStr(p.income)} ${currencySymbol(p.currency)} × ${numStr(p.rate)}',
           onTap: () => onOpenTab(2),
         ),
         StatTile(
@@ -330,7 +332,7 @@ class _Stats extends StatelessWidget {
 
 // ---------------------------------------------------------------- напоминание
 
-/// 28-е наступило, а показаний за период ещё нет.
+/// День показаний наступил, а показаний за период ещё нет.
 class _UtilityReminder extends StatelessWidget {
   const _UtilityReminder({required this.plan, required this.onOpen});
 
@@ -529,7 +531,6 @@ class _Welcome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-    final store = AppScope.of(context).store;
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -551,30 +552,23 @@ class _Welcome extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               FilledButton.icon(
-                icon: const Icon(Icons.table_chart_outlined),
-                label: const Text('Перенести дані з таблиці'),
-                onPressed: () {
-                  final p = store.loadSample();
-                  onSelectPeriod(p.id);
-                },
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Період 10.10–09.11.2026: курс 51, 740 €, квартира, комуналка, '
-                'кредити, витрати за 10–13 жовтня і показники лічильників за 2026 рік.',
-                style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
                 icon: const Icon(Icons.add),
-                label: const Text('Створити новий період'),
-                onPressed: () {
-                  final p = store.createFirstPeriod(DateTime.now());
+                label: const Text('Створити перший період'),
+                onPressed: () async {
+                  final p = await showNewPeriodForm(context);
+                  if (p == null) return;
                   onSelectPeriod(p.id);
                   onOpenTab(2);
                 },
               ),
+              const SizedBox(height: 4),
+              Text(
+                'Вкажіть дати періоду, дохід і валюту. Обов’язкові витрати, кредити '
+                'й тарифи комуналки додаються потім на відповідних вкладках.',
+                style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 icon: const Icon(Icons.sync),

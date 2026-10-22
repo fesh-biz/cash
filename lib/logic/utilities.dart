@@ -1,9 +1,6 @@
 import '../data/models.dart';
 import '../util/format.dart';
 
-/// День месяца, когда снимаются показания и оплачивается коммуналка.
-const meterDay = 28;
-
 double _r2(double v) => (v * 100).roundToDouble() / 100;
 
 /// Счёт за месяц — то, что считала таблица в столбцах E–K.
@@ -88,7 +85,8 @@ class UtilityStatus {
   /// Сумма по умолчанию.
   final double plan;
 
-  /// Когда снимать показания в этом периоде (28-е число внутри периода).
+  /// Когда снимать показания в этом периоде (день показаний внутри периода);
+  /// null — день не задан или его нет в периоде.
   final DateTime? dueDate;
 
   /// Счёт по показаниям, если они уже внесены.
@@ -103,9 +101,17 @@ class UtilityStatus {
   bool isDue(DateTime now) => !isActual && dueDate != null && !dateOnly(now).isBefore(dueDate!);
 }
 
-/// Первое [meterDay]-е число внутри периода (у периода 10.10–09.11 это 28.10).
-DateTime? meterDateIn(Period p) {
-  var d = DateTime(p.start.year, p.start.month, meterDay);
-  if (d.isBefore(p.start)) d = DateTime(p.start.year, p.start.month + 1, meterDay);
+/// Первое [day]-е число внутри периода (у периода 10.10–09.11 и дня 28 —
+/// это 28.10). В коротком месяце берётся его последний день.
+/// null — если день не задан или в период не попадает.
+DateTime? meterDateIn(Period p, int? day) {
+  if (day == null || day < 1) return null;
+  DateTime inMonth(int year, int month) {
+    final last = DateTime(year, month + 1, 0).day;
+    return DateTime(year, month, day > last ? last : day);
+  }
+
+  var d = inMonth(p.start.year, p.start.month);
+  if (d.isBefore(p.start)) d = inMonth(p.start.year, p.start.month + 1);
   return p.contains(d) ? d : null;
 }

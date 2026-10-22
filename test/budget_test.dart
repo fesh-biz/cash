@@ -3,6 +3,8 @@ import 'package:cash/logic/budget.dart';
 import 'package:cash/util/format.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'sample_data.dart';
+
 /// Проверяем, что расчёты совпадают с исходной таблицей (table.jpg).
 void main() {
   late Store store;
@@ -15,7 +17,7 @@ void main() {
 
   setUp(() {
     store = Store.inMemory();
-    store.loadSample();
+    loadSample(store);
     s = summaryAt(DateTime(2026, 10, 13, 12));
   });
 

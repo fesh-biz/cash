@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import '../data/models.dart';
 import '../data/store.dart';
 import '../logic/budget.dart';
-import '../logic/utilities.dart';
+import '../util/currency.dart';
 import '../util/format.dart';
 import 'app_scope.dart';
 import 'common.dart';
+import 'period_form.dart';
 import 'reading_editor.dart';
 import 'utilities_page.dart';
 
@@ -29,7 +30,10 @@ class PeriodPage extends StatelessWidget {
         child: FilledButton.icon(
           icon: const Icon(Icons.add),
           label: const Text('Створити період'),
-          onPressed: () => onSelectPeriod(store.createFirstPeriod(DateTime.now()).id),
+          onPressed: () async {
+            final p = await showNewPeriodForm(context);
+            if (p != null) onSelectPeriod(p.id);
+          },
         ),
       );
     }
@@ -54,29 +58,35 @@ class PeriodPage extends StatelessWidget {
       ],
     );
 
+    final sym = currencySymbol(p.currency);
     final incomeCard = SectionCard(
       title: 'Дохід',
       children: [
         AmountTile(
-          title: 'На місяць, €',
-          amount: p.incomeEur,
-          amountText: '${numStr(p.incomeEur)} €',
-          onTap: () async {
-            final v = await showNumberDialog(context, title: 'Дохід у євро', initial: p.incomeEur, suffix: '€');
-            if (v != null) store.savePeriod(p.copyWith(incomeEur: v));
-          },
+          title: 'Валюта',
+          amount: 0,
+          amountText: currencyLabel(p.currency),
+          onTap: () => _editCurrency(context, store, p),
         ),
         AmountTile(
-          title: 'Курс, ₴ за €',
-          amount: p.rate,
-          amountText: numStr(p.rate),
+          title: 'За період, $sym',
+          amount: p.income,
+          amountText: p.isUahIncome ? money(p.income) : '${numStr(p.income)} $sym',
           onTap: () async {
-            final v = await showNumberDialog(context, title: 'Курс євро', initial: p.rate, suffix: '₴');
-            if (v != null) store.savePeriod(p.copyWith(rate: v));
+            final v = await showNumberDialog(context, title: 'Дохід за період', initial: p.income, suffix: sym);
+            if (v != null) store.savePeriod(p.copyWith(income: v));
           },
         ),
-        const Divider(indent: 16, endIndent: 16),
-        AmountTile(title: 'У гривнях', amount: p.incomeUah, bold: true),
+        if (!p.isUahIncome) ...[
+          AmountTile(
+            title: 'Курс, ₴ за 1 $sym',
+            amount: p.rate,
+            amountText: p.rate > 0 ? numStr(p.rate) : 'не задано',
+            onTap: () => _editRate(context, store, p),
+          ),
+          const Divider(indent: 16, endIndent: 16),
+          AmountTile(title: 'У гривнях', amount: p.incomeUah, bold: true),
+        ],
       ],
     );
 
@@ -96,7 +106,7 @@ class PeriodPage extends StatelessWidget {
               amount: f.amount,
               subtitle: f.isActual && f.readingDate != null
                   ? 'за показниками ${fmtDate(f.readingDate!)}'
-                  : 'план · уточниться за показниками${_dueSuffix(p)}',
+                  : 'план · уточниться за показниками${_dueSuffix(store, p)}',
               leading: Icon(f.isActual ? Icons.check_circle_outline : Icons.schedule,
                   color: f.isActual ? positiveColor(context) : t.colorScheme.onSurfaceVariant),
               onTap: () => _utilitiesActions(context, store, p, f),
@@ -230,9 +240,7 @@ class PeriodPage extends StatelessWidget {
     if (r == null) return;
     final start = dateOnly(r.start);
     final end = dateOnly(r.end);
-    final overlap = store.periods.where((x) => x.id != p.id).where(
-          (x) => !(end.isBefore(x.start) || start.isAfter(x.end)),
-        );
+    final overlap = store.overlapping(start, end, exceptId: p.id);
     if (overlap.isNotEmpty) {
       final o = overlap.first;
       if (context.mounted) {
@@ -241,6 +249,25 @@ class PeriodPage extends StatelessWidget {
       return;
     }
     store.savePeriod(p.copyWith(start: start, end: end));
+  }
+
+  Future<void> _editCurrency(BuildContext context, Store store, Period p) async {
+    final c = await pickCurrency(context, p.currency);
+    if (c == null || c == p.currency) return;
+    if (isUah(c)) {
+      store.savePeriod(p.copyWith(currency: c));
+      return;
+    }
+    // Курс прежней валюты к новой не подходит — сбрасываем и сразу спрашиваем новый.
+    final updated = p.copyWith(currency: c, rate: 0);
+    store.savePeriod(updated);
+    if (context.mounted) await _editRate(context, store, updated);
+  }
+
+  Future<void> _editRate(BuildContext context, Store store, Period p) async {
+    final sym = currencySymbol(p.currency);
+    final v = await showNumberDialog(context, title: 'Курс, ₴ за 1 $sym', initial: p.rate, suffix: '₴');
+    if (v != null) store.savePeriod(p.copyWith(rate: v));
   }
 
   Future<void> _editFixed(BuildContext context, Store store, Period p, FixedExpense? f, int order) async {
@@ -272,8 +299,8 @@ class PeriodPage extends StatelessWidget {
     ));
   }
 
-  static String _dueSuffix(Period p) {
-    final d = meterDateIn(p);
+  static String _dueSuffix(Store store, Period p) {
+    final d = store.utilityStatus(p).dueDate;
     return d == null ? '' : ' ${fmtDateShort(d)}';
   }
 
@@ -329,7 +356,7 @@ class PeriodPage extends StatelessWidget {
     if (action == null || !context.mounted) return;
     switch (action) {
       case 'reading':
-        await showReadingEditor(context, existing: s.reading, date: meterDateIn(p) ?? today());
+        await showReadingEditor(context, existing: s.reading, date: s.dueDate ?? today());
       case 'plan':
         await editUtilityPlan(context);
       case 'open':
