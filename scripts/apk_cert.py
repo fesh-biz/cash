@@ -1,9 +1,9 @@
-"""Відбиток (SHA-256) сертифіката, яким підписано APK.
+"""Отпечаток (SHA-256) сертификата, которым подписан APK.
 
-Читає APK Signing Block (схеми v2/v3) без Android SDK:
+Читает APK Signing Block (схемы v2/v3) без Android SDK:
     python3 scripts/apk_cert.py Cash.apk
 
-Два APK встановлюються один поверх одного, лише якщо відбитки однакові.
+Два APK ставятся один поверх другого, только если отпечатки совпадают.
 """
 
 import hashlib
@@ -19,7 +19,7 @@ def _u32(b, off):
 
 
 def _seq(b):
-    """Послідовність елементів із 4-байтовою довжиною перед кожним."""
+    """Последовательность элементов с 4-байтовой длиной перед каждым."""
     off = 0
     while off + 4 <= len(b):
         n = _u32(b, off)
@@ -39,7 +39,7 @@ def certs(path):
         raise ValueError('не zip-файл')
     cd = _u32(data, eocd + 16)
     if data[cd - 16:cd] != b'APK Sig Block 42':
-        raise ValueError('немає підпису v2/v3')
+        raise ValueError('нет подписи v2/v3')
     size = struct.unpack_from('<Q', data, cd - 24)[0]
     start = cd - size - 8
     off = start + 8
@@ -63,7 +63,7 @@ def certs(path):
         if result:
             break
     if not result:
-        raise ValueError('сертифікат не знайдено')
+        raise ValueError('сертификат не найден')
     return result
 
 

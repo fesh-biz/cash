@@ -51,14 +51,14 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "cash/files")
             .setMethodCallHandler { call, result ->
                 if (pendingResult != null) {
-                    result.error("busy", "Вікно вибору файлу вже відкрите", null)
+                    result.error("busy", "Окно выбора файла уже открыто", null)
                     return@setMethodCallHandler
                 }
                 when (call.method) {
                     "save" -> {
                         val bytes = call.argument<ByteArray>("bytes")
                         if (bytes == null) {
-                            result.error("args", "Немає даних для збереження", null)
+                            result.error("args", "Нет данных для сохранения", null)
                             return@setMethodCallHandler
                         }
                         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
@@ -88,7 +88,7 @@ class MainActivity : FlutterActivity() {
         } catch (e: Exception) {
             pendingResult = null
             pendingBytes = null
-            result.error("no_picker", "Не вдалося відкрити вибір файлу: ${e.message}", null)
+            result.error("no_picker", "Не удалось открыть выбор файла: ${e.message}", null)
         }
     }
 
@@ -111,12 +111,12 @@ class MainActivity : FlutterActivity() {
             try {
                 val value: Any = if (requestCode == REQUEST_SAVE) {
                     val out = contentResolver.openOutputStream(uri, "w")
-                        ?: throw IOException("не вдалося відкрити файл для запису")
+                        ?: throw IOException("не удалось открыть файл для записи")
                     out.use { it.write(bytes ?: ByteArray(0)) }
                     displayName(uri)
                 } else {
                     val input = contentResolver.openInputStream(uri)
-                        ?: throw IOException("не вдалося відкрити файл")
+                        ?: throw IOException("не удалось открыть файл")
                     input.use { it.readBytes() }
                 }
                 runOnUiThread { result.success(value) }

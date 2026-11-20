@@ -3,7 +3,7 @@
 # команда упала — последние строки вывода показываются ещё и как ошибка
 # (annotation) на странице запуска, чтобы причину было видно без скачивания лога.
 #
-#   scripts/ci-run.sh "Збірка APK" flutter build apk --release
+#   scripts/ci-run.sh "Сборка APK" flutter build apk --release
 
 title="$1"
 shift
