@@ -16,17 +16,17 @@ void main() {
     await tester.pumpWidget(CashApp(store: store, sync: sync));
     await tester.pumpAndSettle();
 
-    expect(find.text('Облік фінансів'), findsOneWidget);
-    expect(find.text('Перенести дані з таблиці'), findsNothing);
-    await tester.tap(find.text('Створити перший період'));
+    expect(find.text('Учёт финансов'), findsOneWidget);
+    expect(find.text('Перенести данные из таблицы'), findsNothing);
+    await tester.tap(find.text('Создать первый период'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Новий період'), findsOneWidget);
-    expect(find.text('Обрати дати'), findsOneWidget);
-    FilledButton create() => tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Створити'));
-    expect(create().onPressed, isNull, reason: 'без дат, валюти й доходу створити не можна');
+    expect(find.text('Новый период'), findsOneWidget);
+    expect(find.text('Выбрать даты'), findsOneWidget);
+    FilledButton create() => tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Создать'));
+    expect(create().onPressed, isNull, reason: 'без дат, валюты и дохода создать нельзя');
 
-    // Курс потрібен лише для іноземної валюти.
+    // Курс нужен только для иностранной валюты.
     await tester.tap(find.text('€ EUR'));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(TextField, 'Курс, ₴ за 1 €'), findsOneWidget);
@@ -34,39 +34,39 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.widgetWithText(TextField, 'Курс, ₴ за 1 ₴'), findsNothing);
 
-    await tester.enterText(find.widgetWithText(TextField, 'Дохід за період'), '30000');
+    await tester.enterText(find.widgetWithText(TextField, 'Доход за период'), '30000');
     await tester.pumpAndSettle();
-    expect(create().onPressed, isNull, reason: 'дати ще не обрано');
+    expect(create().onPressed, isNull, reason: 'даты ещё не выбраны');
 
-    await tester.tap(find.text('Скасувати').last);
+    await tester.tap(find.text('Отмена').last);
     await tester.pumpAndSettle();
     expect(store.periods, isEmpty);
     await tester.pump(const Duration(seconds: 1));
   });
 
-  testWidgets('вкладки з даними відкриваються', (tester) async {
+  testWidgets('вкладки с данными открываются', (tester) async {
     final store = Store.inMemory();
     loadSample(store);
     final sync = SyncService(store);
     await tester.pumpWidget(CashApp(store: store, sync: sync));
     await tester.pumpAndSettle();
-    expect(find.text('Витрачено'), findsWidgets);
+    expect(find.text('Потрачено'), findsWidgets);
 
     // Переход по вкладкам не падает.
-    for (final tab in ['Кредити', 'Період', 'Комуналка', 'Синхронізація', 'Бюджет']) {
+    for (final tab in ['Кредиты', 'Период', 'Коммуналка', 'Синхронизация', 'Бюджет']) {
       await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.byTooltip(tab)));
       await tester.pumpAndSettle();
       // Название вкладки — в заголовке страницы.
       expect(find.descendant(of: find.byType(AppBar), matching: find.text(tab)), findsOneWidget);
     }
 
-    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.byTooltip('Період')));
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.byTooltip('Период')));
     await tester.pumpAndSettle();
-    expect(find.text('Євро (EUR)'), findsOneWidget);
+    expect(find.text('Евро (EUR)'), findsOneWidget);
 
-    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.byTooltip('Комуналка')));
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.byTooltip('Коммуналка')));
     await tester.pumpAndSettle();
-    expect(find.text('Налаштування'), findsOneWidget);
+    expect(find.text('Настройки'), findsOneWidget);
     expect(find.text('28-го'), findsOneWidget);
 
     // Сбрасываем таймер отложенного сохранения.

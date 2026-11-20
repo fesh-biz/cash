@@ -31,7 +31,7 @@ Period loadSample(Store store) {
     store.savePeriod(p);
     final fixed = [
       ('Квартира', 10000.0, FixedKind.manual),
-      ('Комуналка', 4000.0, FixedKind.utilities),
+      ('Коммуналка', 4000.0, FixedKind.utilities),
     ];
     for (var i = 0; i < fixed.length; i++) {
       store.saveFixed(FixedExpense(
@@ -43,7 +43,7 @@ Period loadSample(Store store) {
         kind: fixed[i].$3,
       ));
     }
-    final credits = [('Кредит 1', 1850.0), ('Кредит 2', 666.0), ('Кредит 3', 640.0), ('Відсотки', 700.0)];
+    final credits = [('Кредит 1', 1850.0), ('Кредит 2', 666.0), ('Кредит 3', 640.0), ('Проценты', 700.0)];
     for (var i = 0; i < credits.length; i++) {
       final id = '${p.id}-cr-$i';
       store.put(RecType.credit, id,

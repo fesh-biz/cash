@@ -52,7 +52,7 @@ class _NewPeriodFormState extends State<_NewPeriodForm> {
     final d = _dates;
     if (d == null) return null;
     final o = AppScope.of(context).store.overlapping(dateOnly(d.start), dateOnly(d.end));
-    return o.isEmpty ? null : 'Перетинається з періодом ${fmtRange(o.first.start, o.first.end)}';
+    return o.isEmpty ? null : 'Пересекается с периодом ${fmtRange(o.first.start, o.first.end)}';
   }
 
   bool get _valid {
@@ -76,7 +76,7 @@ class _NewPeriodFormState extends State<_NewPeriodForm> {
       lastDate: DateTime(2100),
       initialDateRange: _dates,
       currentDate: today(),
-      helpText: 'Дати періоду',
+      helpText: 'Даты периода',
       saveText: 'Готово',
     );
     if (r != null && mounted) setState(() => _dates = r);
@@ -116,18 +116,18 @@ class _NewPeriodFormState extends State<_NewPeriodForm> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Новий період', style: t.textTheme.titleLarge),
+          Text('Новый период', style: t.textTheme.titleLarge),
           const SizedBox(height: 4),
           Text(
-            'Зазвичай — від зарплати до дня перед наступною.',
+            'Обычно — от зарплаты до дня перед следующей.',
             style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 16),
-          label('Дати'),
+          label('Даты'),
           OutlinedButton.icon(
             icon: const Icon(Icons.date_range_outlined),
             label: Text(d == null
-                ? 'Обрати дати'
+                ? 'Выбрать даты'
                 : '${fmtDate(d.start)} – ${fmtDate(d.end)} · ${daysStr(daysBetween(d.start, d.end) + 1)}'),
             onPressed: _pickDates,
           ),
@@ -137,12 +137,12 @@ class _NewPeriodFormState extends State<_NewPeriodForm> {
               child: Text(overlap, style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.error)),
             ),
           const SizedBox(height: 20),
-          label('Валюта доходу'),
+          label('Валюта дохода'),
           CurrencyChips(selected: _currency, onSelected: (c) => setState(() => _currency = c)),
           const SizedBox(height: 16),
           AmountField(
             controller: _income,
-            label: 'Дохід за період',
+            label: 'Доход за период',
             suffix: sym.isEmpty ? ' ' : sym,
           ),
           if (_foreign) ...[
@@ -151,16 +151,16 @@ class _NewPeriodFormState extends State<_NewPeriodForm> {
             if (income != null && rate != null && rate > 0)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
-                child: Text('У гривнях: ${money(income * rate)}', style: t.textTheme.bodyMedium),
+                child: Text('В гривнах: ${money(income * rate)}', style: t.textTheme.bodyMedium),
               ),
           ],
           const SizedBox(height: 12),
-          AmountField(controller: _credit, label: 'Плачу на кредити за період'),
+          AmountField(controller: _credit, label: 'Плачу на кредиты за период'),
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(
-              'Якщо кредитів немає — залиште порожнім. Обов’язкові витрати (житло, комуналка) '
-              'додаються потім на вкладці «Період».',
+              'Если кредитов нет — оставьте пустым. Обязательные расходы (жильё, коммуналка) '
+              'добавляются потом на вкладке «Период».',
               style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
             ),
           ),
@@ -168,9 +168,9 @@ class _NewPeriodFormState extends State<_NewPeriodForm> {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Скасувати')),
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
               const SizedBox(width: 8),
-              FilledButton(onPressed: _valid ? _save : null, child: const Text('Створити')),
+              FilledButton(onPressed: _valid ? _save : null, child: const Text('Создать')),
             ],
           ),
         ],
@@ -179,7 +179,7 @@ class _NewPeriodFormState extends State<_NewPeriodForm> {
   }
 }
 
-/// Выбор валюты: частые валюты и «Інша…» со своим кодом.
+/// Выбор валюты: частые валюты и «Другая…» со своим кодом.
 class CurrencyChips extends StatelessWidget {
   const CurrencyChips({super.key, required this.selected, required this.onSelected});
 
@@ -190,10 +190,10 @@ class CurrencyChips extends StatelessWidget {
     final known = currencies.any((c) => c.code == selected);
     final v = await showTextDialog(
       context,
-      title: 'Інша валюта',
-      label: 'Код валюти',
+      title: 'Другая валюта',
+      label: 'Код валюты',
       initial: selected == null || known ? '' : selected!,
-      help: 'Трилітерний код, наприклад SEK, CAD або TRY.',
+      help: 'Трёхбуквенный код, например SEK, CAD или TRY.',
     );
     if (v == null) return;
     final code = normalizeCurrency(v);
@@ -216,7 +216,7 @@ class CurrencyChips extends StatelessWidget {
             onSelected: (_) => onSelected(c.code),
           ),
         ChoiceChip(
-          label: Text(custom ? sel : 'Інша…'),
+          label: Text(custom ? sel : 'Другая…'),
           selected: custom,
           onSelected: (_) => _other(context),
         ),
@@ -230,7 +230,7 @@ Future<String?> pickCurrency(BuildContext context, String current) {
   return showDialog<String>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Валюта доходу'),
+      title: const Text('Валюта дохода'),
       content: SizedBox(
         width: 380,
         child: Column(
@@ -238,7 +238,7 @@ Future<String?> pickCurrency(BuildContext context, String current) {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Бюджет ведеться в гривнях. Дохід в іншій валюті перераховується за курсом періоду.',
+              'Бюджет ведётся в гривнах. Доход в другой валюте пересчитывается по курсу периода.',
               style: Theme.of(ctx).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
@@ -246,7 +246,7 @@ Future<String?> pickCurrency(BuildContext context, String current) {
           ],
         ),
       ),
-      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Скасувати'))],
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена'))],
     ),
   );
 }

@@ -12,7 +12,7 @@ import 'package:flutter/services.dart';
 
 const _channel = MethodChannel('cash/files');
 
-const _jsonGroup = XTypeGroup(label: 'Резервна копія Cash (JSON)', extensions: <String>['json']);
+const _jsonGroup = XTypeGroup(label: 'Резервная копия Cash (JSON)', extensions: <String>['json']);
 
 /// Сохраняет [bytes] в файл, который выберет пользователь. Возвращает имя
 /// или путь сохранённого файла; null — пользователь закрыл окно.

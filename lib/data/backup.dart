@@ -6,13 +6,13 @@ import 'record.dart';
 /// Зачем сделана резервная копия.
 enum BackupReason {
   /// Пользователь сохранил копию сам.
-  manual('manual', 'Створена вручну'),
+  manual('manual', 'Создана вручную'),
 
   /// Автокопия перед восстановлением другой копии на этом устройстве.
-  beforeImport('before-import', 'Перед відновленням з копії'),
+  beforeImport('before-import', 'Перед восстановлением из копии'),
 
   /// Автокопия перед заменой данных во время синхронизации.
-  beforeSync('before-sync', 'Перед заміною даних під час синхронізації');
+  beforeSync('before-sync', 'Перед заменой данных при синхронизации');
 
   const BackupReason(this.code, this.label);
 
@@ -73,17 +73,17 @@ class Backup {
     try {
       json = jsonDecode(text);
     } catch (_) {
-      throw BackupFormatException('Це не файл резервної копії Cash');
+      throw BackupFormatException('Это не файл резервной копии Cash');
     }
     if (json is! Map || json['kind'] != kind) {
-      throw BackupFormatException('Це не файл резервної копії Cash');
+      throw BackupFormatException('Это не файл резервной копии Cash');
     }
     final format = json['format'];
     if (format is num && format > formatVersion) {
-      throw BackupFormatException('Копію створено новішою версією Cash — спершу оновіть застосунок');
+      throw BackupFormatException('Копия создана более новой версией Cash — сначала обновите приложение');
     }
     final list = json['records'];
-    if (list is! List) throw BackupFormatException('Файл копії пошкоджено');
+    if (list is! List) throw BackupFormatException('Файл копии повреждён');
     final records = list.map(SyncRecord.tryFromJson).whereType<SyncRecord>().where((r) => !r.deleted).toList();
     final created = json['createdAt'];
     return Backup(

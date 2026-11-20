@@ -105,7 +105,7 @@ class _CashAppState extends State<CashApp> {
         theme: _theme(Brightness.light),
         darkTheme: _theme(Brightness.dark),
         themeMode: ThemeMode.system,
-        locale: const Locale('uk'),
+        locale: const Locale('ru'),
         supportedLocales: const [Locale('ru'), Locale('uk'), Locale('en')],
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
         home: const HomeShell(),

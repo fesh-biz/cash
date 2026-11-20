@@ -17,7 +17,7 @@ class CreditsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = period;
     if (p == null) {
-      return const Center(child: Text('Спочатку створіть період на вкладці «Бюджет»'));
+      return const Center(child: Text('Сначала создайте период на вкладке «Бюджет»'));
     }
     final store = AppScope.of(context).store;
     final now = DateTime.now();
@@ -37,47 +37,47 @@ class CreditsPage extends StatelessWidget {
     final summary = StatGrid(
       minTileWidth: 150,
       children: [
-        StatTile(label: 'До сплати в періоді', value: money(due), hint: 'сума платежів'),
+        StatTile(label: 'К оплате в периоде', value: money(due), hint: 'сумма платежей'),
         StatTile(label: 'Внесено', value: money(paid)),
         StatTile(
-          label: diff.round() >= 0 ? 'Внесено понад платежі' : 'Бракує до платежів',
+          label: diff.round() >= 0 ? 'Внесено сверх платежей' : 'Не хватает до платежей',
           value: money(diff.abs()),
           color: balanceColor(context, diff),
         ),
         StatTile(
-          label: 'Плачу (з бюджету)',
+          label: 'Плачу (из бюджета)',
           value: money(p.creditPlan),
           hint: planLeft.round() > 0
-              ? 'ще внести ${money(planLeft)}'
+              ? 'ещё внести ${money(planLeft)}'
               : planLeft.round() < 0
-                  ? 'внесено більше за план на ${money(-planLeft)}'
-                  : 'внесено за планом',
+                  ? 'внесено больше плана на ${money(-planLeft)}'
+                  : 'внесено по плану',
           onTap: () => _editPlan(context, store, p),
         ),
         if (installments.isNotEmpty)
           StatTile(
-            label: 'Залишилось виплатити',
+            label: 'Осталось выплатить',
             value: money(leftSum),
             hint: active.isEmpty
-                ? 'усі розстрочки виплачено'
-                : '$leftCount ${plural(leftCount, 'платіж', 'платежі', 'платежів')} '
-                    'за ${active.length} ${plural(active.length, 'розстрочкою', 'розстрочками', 'розстрочками')}',
+                ? 'все рассрочки выплачены'
+                : '$leftCount ${plural(leftCount, 'платёж', 'платежа', 'платежей')} '
+                    'по ${active.length} ${plural(active.length, 'рассрочке', 'рассрочкам', 'рассрочкам')}',
           ),
       ],
     );
 
     final itemsCard = SectionCard(
-      title: 'Кредити й розстрочки',
+      title: 'Кредиты и рассрочки',
       trailing: IconButton(
-        tooltip: 'Додати',
+        tooltip: 'Добавить',
         icon: const Icon(Icons.add),
         onPressed: () => _editItem(context, store, p, null, items.length),
       ),
       children: [
         if (items.isEmpty)
           const ListTile(
-            title: Text('Платежів немає'),
-            subtitle: Text('Додайте кредити, розстрочки й відсотки'),
+            title: Text('Платежей нет'),
+            subtitle: Text('Добавьте кредиты, рассрочки и проценты'),
           ),
         for (final c in items)
           _CreditTile(
@@ -88,7 +88,7 @@ class CreditsPage extends StatelessWidget {
           ),
         if (items.isNotEmpty) ...[
           const Divider(indent: 16, endIndent: 16),
-          AmountTile(title: 'Усього в цьому періоді', amount: due, bold: true),
+          AmountTile(title: 'Всего в этом периоде', amount: due, bold: true),
         ],
       ],
     );
@@ -101,7 +101,7 @@ class CreditsPage extends StatelessWidget {
         onPressed: () => _editDeposit(context, store, p, null),
       ),
       children: [
-        if (deposits.isEmpty) const ListTile(title: Text('Поки нічого не внесено')),
+        if (deposits.isEmpty) const ListTile(title: Text('Пока ничего не внесено')),
         for (final d in deposits)
           AmountTile(
             title: fmtDate(d.date),
@@ -111,7 +111,7 @@ class CreditsPage extends StatelessWidget {
           ),
         if (deposits.isNotEmpty) ...[
           const Divider(indent: 16, endIndent: 16),
-          AmountTile(title: 'Усього', amount: paid, bold: true),
+          AmountTile(title: 'Всего', amount: paid, bold: true),
         ],
       ],
     );
@@ -138,10 +138,10 @@ class CreditsPage extends StatelessWidget {
         ],
         const SizedBox(height: 12),
         Text(
-          '«Плачу» — сума, яку ви відкладаєте на кредити з доходу періоду; '
-          'вона віднімається з бюджету на життя. Для розстрочки вкажіть кількість '
-          'платежів і дату першого — застосунок сам порахує, скільки залишилось. '
-          'Зміни кредиту переносяться й у наступні періоди.',
+          '«Плачу» — сумма, которую вы откладываете на кредиты из дохода периода; '
+          'она вычитается из бюджета на жизнь. Для рассрочки укажите количество '
+          'платежей и дату первого — приложение само посчитает, сколько осталось. '
+          'Изменения кредита переносятся и в следующие периоды.',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -153,9 +153,9 @@ class CreditsPage extends StatelessWidget {
   Future<void> _editPlan(BuildContext context, Store store, Period p) async {
     final v = await showNumberDialog(
       context,
-      title: 'Плачу на кредити',
+      title: 'Плачу на кредиты',
       initial: p.creditPlan,
-      help: 'Скільки з доходу періоду йде на кредити. Віднімається з бюджету.',
+      help: 'Сколько из дохода периода идёт на кредиты. Вычитается из бюджета.',
     );
     if (v != null) store.savePeriod(p.copyWith(creditPlan: v));
   }
@@ -171,7 +171,7 @@ class CreditsPage extends StatelessWidget {
       if (context.mounted) {
         showSnack(
           context,
-          ids.length > 1 ? 'Видалено з цього й наступних періодів' : 'Платіж видалено',
+          ids.length > 1 ? 'Удалено из этого и следующих периодов' : 'Платёж удалён',
           undo: () {
             for (final id in ids) {
               store.restore(id);
@@ -202,14 +202,14 @@ class CreditsPage extends StatelessWidget {
       amount: d?.amount,
       date: d?.date ?? (p.contains(today()) ? today() : p.start),
       withDate: true,
-      nameLabel: 'Коментар (необов’язково)',
+      nameLabel: 'Комментарий (необязательно)',
       canDelete: d != null,
     );
     if (r == null) return;
     if (r.delete) {
       final id = d!.id;
       store.remove(id);
-      if (context.mounted) showSnack(context, 'Запис видалено', undo: () => store.restore(id));
+      if (context.mounted) showSnack(context, 'Запись удалена', undo: () => store.restore(id));
       return;
     }
     store.saveDeposit(CreditDeposit(
@@ -235,9 +235,9 @@ class _CreditTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = item;
-    final name = c.name.isEmpty ? 'Без назви' : c.name;
+    final name = c.name.isEmpty ? 'Без названия' : c.name;
     if (!c.isInstallment) {
-      return AmountTile(title: name, amount: c.amount, subtitle: 'щомісяця', onTap: onTap);
+      return AmountTile(title: name, amount: c.amount, subtitle: 'ежемесячно', onTap: onTap);
     }
 
     final t = Theme.of(context);
@@ -246,14 +246,14 @@ class _CreditTile extends StatelessWidget {
     final String status;
     final String details;
     if (info.finished) {
-      status = 'Виплачено повністю';
-      details = 'Останній платіж ${fmtDate(info.last)} · усього ${money(info.totalSum)}';
+      status = 'Выплачено полностью';
+      details = 'Последний платёж ${fmtDate(info.last)} · всего ${money(info.totalSum)}';
     } else {
-      status = 'Залишилось ${info.left} ${plural(info.left, 'платіж', 'платежі', 'платежів')} '
-          'з ${info.total} · ${money(info.leftSum)}';
-      details = 'Наступний ${fmtDayLong(info.next!)}'
+      status = 'Осталось ${info.left} ${plural(info.left, 'платёж', 'платежа', 'платежей')} '
+          'из ${info.total} · ${money(info.leftSum)}';
+      details = 'Следующий ${fmtDayLong(info.next!)}'
           '${info.next!.year != now.year ? ' ${info.next!.year}' : ''}'
-          ' · останній ${fmtDate(info.last)} · усього ${money(info.totalSum)}';
+          ' · последний ${fmtDate(info.last)} · всего ${money(info.totalSum)}';
     }
 
     return InkWell(
@@ -271,7 +271,7 @@ class _CreditTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '${money(c.amount)}/міс',
+                  '${money(c.amount)}/мес',
                   style: t.textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w500,
                     fontFeatures: tabular,
@@ -302,7 +302,7 @@ class _CreditTile extends StatelessWidget {
             Text(details, style: t.textTheme.bodySmall?.copyWith(color: muted, fontFeatures: tabular)),
             if (!inPeriod)
               Text(
-                'У цьому періоді платежу немає',
+                'В этом периоде платежа нет',
                 style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.tertiary),
               ),
           ],
@@ -353,7 +353,7 @@ class _CreditDialogState extends State<_CreditDialog> {
   /// Новый кредит обычно заводят в день оформления, когда первый платёж уже внесён.
   late bool _firstPaid = widget.item?.firstPaid ?? true;
 
-  /// Галочка «сплачено при оформленні» имеет смысл, только если первый платёж
+  /// Галочка «оплачен при оформлении» имеет смысл, только если первый платёж
   /// сегодня: прошедшие и так выплачены, будущие ещё нет.
   bool get _firstIsToday => _first == today();
 
@@ -432,7 +432,7 @@ class _CreditDialogState extends State<_CreditDialog> {
     }
 
     return AlertDialog(
-      title: Text(widget.item == null ? 'Новий кредит / платіж' : 'Кредит'),
+      title: Text(widget.item == null ? 'Новый кредит / платёж' : 'Кредит'),
       content: SizedBox(
         width: 420,
         child: SingleChildScrollView(
@@ -445,17 +445,17 @@ class _CreditDialogState extends State<_CreditDialog> {
                 autofocus: widget.item == null,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: const InputDecoration(
-                  labelText: 'Назва (наприклад, «Розстрочка Rozetka» або «Відсотки»)',
+                  labelText: 'Название (например, «Рассрочка Rozetka» или «Проценты»)',
                   border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
-              AmountField(controller: _amount, label: 'Платіж на місяць', onSubmitted: _ok),
+              AmountField(controller: _amount, label: 'Платёж в месяц', onSubmitted: _ok),
               const SizedBox(height: 4),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Розстрочка або кредит на строк'),
-                subtitle: const Text('Вказати кількість платежів і дату'),
+                title: const Text('Рассрочка или кредит на срок'),
+                subtitle: const Text('Указать количество платежей и дату'),
                 value: _installment,
                 onChanged: (v) => setState(() => _installment = v),
               ),
@@ -465,15 +465,15 @@ class _CreditDialogState extends State<_CreditDialog> {
                   controller: _count,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
-                    labelText: 'Усього платежів',
+                    labelText: 'Всего платежей',
                     border: const OutlineInputBorder(),
-                    errorText: _count.text.trim().isNotEmpty && n == null ? 'Ціле число від 1 до 600' : null,
+                    errorText: _count.text.trim().isNotEmpty && n == null ? 'Целое число от 1 до 600' : null,
                   ),
                 ),
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.event_outlined),
-                  label: Text('Перший платіж: ${fmtDate(_first)}'),
+                  label: Text('Первый платёж: ${fmtDate(_first)}'),
                   onPressed: () async {
                     final d = await pickDate(context, _first);
                     if (d != null && mounted) setState(() => _first = d);
@@ -483,7 +483,7 @@ class _CreditDialogState extends State<_CreditDialog> {
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
                     controlAffinity: ListTileControlAffinity.leading,
-                    title: const Text('Перший платіж сплачено при оформленні'),
+                    title: const Text('Первый платёж оплачен при оформлении'),
                     value: _firstPaid,
                     onChanged: (v) => setState(() => _firstPaid = v ?? false),
                   ),
@@ -491,7 +491,7 @@ class _CreditDialogState extends State<_CreditDialog> {
                   alignment: Alignment.centerLeft,
                   child: TextButton(
                     onPressed: _fromRemaining,
-                    child: const Text('Не пам’ятаю першого — знаю, скільки залишилось'),
+                    child: const Text('Не помню первый — знаю, сколько осталось'),
                   ),
                 ),
                 if (info != null)
@@ -507,13 +507,13 @@ class _CreditDialogState extends State<_CreditDialog> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Усього за розстрочкою: ${money(info.totalSum)}',
+                          Text('Всего по рассрочке: ${money(info.totalSum)}',
                               style: const TextStyle(fontWeight: FontWeight.w600)),
                           const SizedBox(height: 2),
                           Text(info.finished
-                              ? 'Виплачено повністю'
-                              : 'Минуло ${info.paid} з ${info.total}, залишилось ${info.left} · ${money(info.leftSum)}'),
-                          Text('Платіж ${info.dayOfMonth}-го числа, останній — ${fmtDate(info.last)}'),
+                              ? 'Выплачено полностью'
+                              : 'Прошло ${info.paid} из ${info.total}, осталось ${info.left} · ${money(info.leftSum)}'),
+                          Text('Платёж ${info.dayOfMonth}-го числа, последний — ${fmtDate(info.last)}'),
                         ],
                       ),
                     ),
@@ -528,10 +528,10 @@ class _CreditDialogState extends State<_CreditDialog> {
           TextButton(
             style: TextButton.styleFrom(foregroundColor: t.colorScheme.error),
             onPressed: () => Navigator.pop(context, _CreditEdit(name: '', amount: 0, delete: true)),
-            child: const Text('Видалити'),
+            child: const Text('Удалить'),
           ),
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Скасувати')),
-        FilledButton(onPressed: _ok, child: const Text('Зберегти')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
+        FilledButton(onPressed: _ok, child: const Text('Сохранить')),
       ],
     );
   }
@@ -564,7 +564,7 @@ class _RemainingDialogState extends State<_RemainingDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Скільки залишилось'),
+      title: const Text('Сколько осталось'),
       content: SizedBox(
         width: 360,
         child: Column(
@@ -576,7 +576,7 @@ class _RemainingDialogState extends State<_RemainingDialog> {
               autofocus: true,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
-                labelText: 'Залишилось платежів (включно з найближчим)',
+                labelText: 'Осталось платежей (включая ближайший)',
                 border: OutlineInputBorder(),
               ),
               onSubmitted: (_) => _ok(),
@@ -584,7 +584,7 @@ class _RemainingDialogState extends State<_RemainingDialog> {
             const SizedBox(height: 12),
             OutlinedButton.icon(
               icon: const Icon(Icons.event_outlined),
-              label: Text('Найближчий платіж: ${fmtDate(_next)}'),
+              label: Text('Ближайший платёж: ${fmtDate(_next)}'),
               onPressed: () async {
                 final d = await pickDate(context, _next);
                 if (d != null && mounted) setState(() => _next = d);
@@ -594,7 +594,7 @@ class _RemainingDialogState extends State<_RemainingDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Скасувати')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
         FilledButton(onPressed: _ok, child: const Text('Готово')),
       ],
     );

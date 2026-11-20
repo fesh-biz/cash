@@ -28,7 +28,7 @@ void main() {
       final s = Store.inMemory(deviceId: 'aaaa', backupDir: dir);
       loadSample(s);
       final copy = s.makeBackup(BackupReason.manual);
-      s.addExpense(day, 999, 'після копії');
+      s.addExpense(day, 999, 'после копии');
       expect(s.epoch, '');
 
       final auto = await s.importBackup(copy);

@@ -175,7 +175,7 @@ class Store extends ChangeNotifier {
           }
         }
       } catch (e) {
-        debugPrint('Не вдалося прочитати ${candidate.path}: $e');
+        debugPrint('Не удалось прочитать ${candidate.path}: $e');
       }
     }
 
@@ -221,11 +221,11 @@ class Store extends ChangeNotifier {
       try {
         return 'ПК ${Platform.localHostname}';
       } catch (_) {
-        return 'Комп’ютер';
+        return 'Компьютер';
       }
     }
     if (Platform.isAndroid || Platform.isIOS) return 'Телефон';
-    return 'Пристрій';
+    return 'Устройство';
   }
 
   // ---------------------------------------------------------------- запись
@@ -261,7 +261,7 @@ class Store extends ChangeNotifier {
         await _writeNow();
       } while (_savePending);
     } catch (e) {
-      debugPrint('Помилка збереження: $e');
+      debugPrint('Ошибка сохранения: $e');
     } finally {
       _saving = false;
     }
@@ -464,7 +464,7 @@ class Store extends ChangeNotifier {
       try {
         result.add(StoredBackup(f, Backup.parse(await f.readAsString())));
       } catch (e) {
-        debugPrint('Автокопія ${f.path}: $e');
+        debugPrint('Автокопия ${f.path}: $e');
       }
     }
     result.sort((a, b) => b.backup.createdAt.compareTo(a.backup.createdAt));
@@ -502,7 +502,7 @@ class Store extends ChangeNotifier {
         await all[i].delete();
       }
     } catch (e) {
-      debugPrint('Очищення автокопій: $e');
+      debugPrint('Очистка автокопий: $e');
     }
     return f;
   }
@@ -749,7 +749,7 @@ class Store extends ChangeNotifier {
     saveFixed(FixedExpense(
       id: newId(),
       periodId: p.id,
-      name: 'Комуналка',
+      name: 'Коммуналка',
       amount: utilityConfig.plan ?? 0,
       order: raw.isEmpty ? 0 : raw.map((f) => f.order).reduce(max) + 1,
       kind: FixedKind.utilities,

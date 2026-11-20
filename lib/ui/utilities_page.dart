@@ -23,18 +23,18 @@ class UtilitiesPage extends StatelessWidget {
     final periodCard = period == null ? null : _PeriodCard(period: period!);
 
     final planCard = SectionCard(
-      title: 'Налаштування',
+      title: 'Настройки',
       children: [
         AmountTile(
-          title: 'Сума за замовчуванням',
-          subtitle: 'Йде в бюджет, доки не внесено показники за період',
+          title: 'Сумма по умолчанию',
+          subtitle: 'Идёт в бюджет, пока не внесены показания за период',
           amount: config.plan ?? 0,
           amountText: config.plan == null ? 'не задано' : money(config.plan!),
           onTap: () => editUtilityPlan(context),
         ),
         AmountTile(
-          title: 'День зняття показників',
-          subtitle: 'Цього дня з’явиться нагадування внести показники',
+          title: 'День снятия показаний',
+          subtitle: 'В этот день появится напоминание внести показания',
           amount: 0,
           amountText: config.meterDay == null ? 'не задано' : '${config.meterDay}-го',
           onTap: () => editMeterDay(context),
@@ -45,17 +45,17 @@ class UtilitiesPage extends StatelessWidget {
     final tariffsCard = _TariffsCard(config: config);
 
     final historyCard = SectionCard(
-      title: 'Показники',
+      title: 'Показания',
       trailing: IconButton(
-        tooltip: 'Внести показники',
+        tooltip: 'Внести показания',
         icon: const Icon(Icons.add),
         onPressed: () => showReadingEditor(context),
       ),
       children: [
         if (readings.isEmpty)
           const ListTile(
-            title: Text('Показників поки немає'),
-            subtitle: Text('Перші показники стануть базою: з ними порівнюватимуться наступні'),
+            title: Text('Показаний пока нет'),
+            subtitle: Text('Первые показания станут базой: с ними будут сравниваться следующие'),
           ),
         if (readings.isNotEmpty)
           _ReadingsList(rows: [for (final m in readings.reversed) (m, store.billFor(m))]),
@@ -106,10 +106,10 @@ Future<void> editUtilityPlan(BuildContext context) async {
   final current = config.plan ?? (p == null ? 0.0 : store.utilityStatus(p).plan);
   final v = await showNumberDialog(
     context,
-    title: 'Комуналка за замовчуванням',
+    title: 'Коммуналка по умолчанию',
     initial: current,
-    help: 'Ця сума стоїть у бюджеті періоду, доки не внесено показники лічильників. '
-        'Діє, доки ви її не зміните (наприклад, на опалювальний сезон).',
+    help: 'Эта сумма стоит в бюджете периода, пока не внесены показания счётчиков. '
+        'Действует, пока вы её не измените (например, на отопительный сезон).',
   );
   if (v != null) store.saveUtilityConfig(config.copyWith(plan: v));
 }
@@ -120,15 +120,15 @@ Future<void> editMeterDay(BuildContext context) async {
   final config = store.utilityConfig;
   final v = await showNumberDialog(
     context,
-    title: 'День зняття показників',
+    title: 'День снятия показаний',
     initial: (config.meterDay ?? 0).toDouble(),
     suffix: '-го',
-    help: 'Число місяця від 1 до 31. Якщо в місяці менше днів — береться останній день.',
+    help: 'Число месяца от 1 до 31. Если в месяце меньше дней — берётся последний день.',
   );
   if (v == null) return;
   final day = v.round();
   if (day < 1 || day > 31 || day != v) {
-    if (context.mounted) showSnack(context, 'Вкажіть число від 1 до 31');
+    if (context.mounted) showSnack(context, 'Укажите число от 1 до 31');
     return;
   }
   store.saveUtilityConfig(config.copyWith(meterDay: day));
@@ -145,21 +145,21 @@ class _PeriodCard extends StatelessWidget {
     final t = Theme.of(context);
     final store = AppScope.of(context).store;
     final item = store.utilitiesItemOf(period.id);
-    final title = 'У періоді ${fmtRange(period.start, period.end)}';
+    final title = 'В периоде ${fmtRange(period.start, period.end)}';
 
     if (item == null) {
       return SectionCard(
         title: title,
         children: [
           const ListTile(
-            title: Text('Комуналку не підключено до цього періоду'),
-            subtitle: Text('Сума в бюджеті періоду не братиметься з показників'),
+            title: Text('Коммуналка не подключена к этому периоду'),
+            subtitle: Text('Сумма в бюджете периода не будет браться из показаний'),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: FilledButton.tonalIcon(
               icon: const Icon(Icons.link),
-              label: const Text('Підключити'),
+              label: const Text('Подключить'),
               onPressed: () => store.attachUtilities(period),
             ),
           ),
@@ -172,17 +172,17 @@ class _PeriodCard extends StatelessWidget {
     final now = DateTime.now();
     final String status;
     if (s.isActual) {
-      status = 'Факт за показниками ${fmtDate(s.bill!.reading.date)}';
+      status = 'Факт по показаниям ${fmtDate(s.bill!.reading.date)}';
     } else if (s.reading != null) {
-      status = 'План: показники ${fmtDate(s.reading!.date)} — перші, порівнювати нема з чим';
+      status = 'План: показания ${fmtDate(s.reading!.date)} — первые, сравнивать не с чем';
     } else if (due != null && s.isDue(now)) {
-      status = 'План. Час зняти показники (${fmtDayLong(due)})';
+      status = 'План. Пора снять показания (${fmtDayLong(due)})';
     } else if (due != null) {
-      status = 'План, доки не внесено показники ${fmtDayLong(due)}';
+      status = 'План, пока не внесены показания ${fmtDayLong(due)}';
     } else if (store.utilityConfig.meterDay == null) {
-      status = 'План. День зняття показників не задано';
+      status = 'План. День снятия показаний не задан';
     } else {
-      status = 'План: у періоді немає ${store.utilityConfig.meterDay}-го числа';
+      status = 'План: в периоде нет ${store.utilityConfig.meterDay}-го числа';
     }
 
     final fg = s.isActual ? t.colorScheme.onPrimaryContainer : t.colorScheme.onSurface;
@@ -229,13 +229,13 @@ class _PeriodCard extends StatelessWidget {
                   if (s.reading == null)
                     FilledButton.icon(
                       icon: const Icon(Icons.speed),
-                      label: const Text('Внести показники'),
+                      label: const Text('Внести показания'),
                       onPressed: () => showReadingEditor(context, date: _suggestDate(due, now)),
                     )
                   else
                     OutlinedButton.icon(
                       icon: const Icon(Icons.edit_outlined),
-                      label: const Text('Змінити показники'),
+                      label: const Text('Изменить показания'),
                       onPressed: () => showReadingEditor(context, existing: s.reading),
                     ),
                 ],
@@ -302,12 +302,12 @@ class _TableHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Row(
         children: [
-          cell('Місяць', _fMonth, right: false),
+          cell('Месяц', _fMonth, right: false),
           cell('Ванна, м³', _fMeter),
           cell('Кухня, м³', _fMeter),
-          cell('Ел, кВт·год', _fMeter),
-          cell('Опал., ₴', _fHeat),
-          cell('Сума, ₴', _fSum),
+          cell('Эл, кВт·ч', _fMeter),
+          cell('Отоп., ₴', _fHeat),
+          cell('Сумма, ₴', _fSum),
         ],
       ),
     );
@@ -409,10 +409,10 @@ class _ReadingTile extends StatelessWidget {
       if (b != null) ...[
         'ванна ${numStr(b.bathUsed)} м³',
         'кухня ${numStr(b.kitchenUsed)} м³',
-        'світло ${numStr(b.elUsed)} кВт·год',
-        if (b.heating > 0) 'опал. ${money(b.heating)}',
+        'свет ${numStr(b.elUsed)} кВт·ч',
+        if (b.heating > 0) 'отоп. ${money(b.heating)}',
       ] else
-        'ванна ${numStr(m.bath)} · кухня ${numStr(m.kitchen)} · ел ${numStr(m.el)}',
+        'ванна ${numStr(m.bath)} · кухня ${numStr(m.kitchen)} · эл ${numStr(m.el)}',
     ];
     return ListTile(
       title: Text('${monthTitle(m.date)} · ${fmtDateShort(m.date)}'),
@@ -454,26 +454,26 @@ class _TariffsCard extends StatelessWidget {
     }
 
     return SectionCard(
-      title: 'Тарифи',
+      title: 'Тарифы',
       children: [
-        tile('Абонплата: постачання води', tr.waterSubIn, '₴', (v) => tr.copyWith(waterSubIn: v)),
-        tile('Абонплата: водовідведення', tr.waterSubOut, '₴', (v) => tr.copyWith(waterSubOut: v)),
+        tile('Абонплата: водоснабжение', tr.waterSubIn, '₴', (v) => tr.copyWith(waterSubIn: v)),
+        tile('Абонплата: водоотведение', tr.waterSubOut, '₴', (v) => tr.copyWith(waterSubOut: v)),
         tile('Вода, за 1 м³', tr.cubeIn, '₴', (v) => tr.copyWith(cubeIn: v)),
-        tile('Водовідведення, за 1 м³', tr.cubeOut, '₴', (v) => tr.copyWith(cubeOut: v)),
-        tile('Електроенергія, за 1 кВт·год', tr.kwh, '₴', (v) => tr.copyWith(kwh: v)),
-        tile('Абонплата ЖКГ', tr.housing, '₴', (v) => tr.copyWith(housing: v)),
+        tile('Водоотведение, за 1 м³', tr.cubeOut, '₴', (v) => tr.copyWith(cubeOut: v)),
+        tile('Электроэнергия, за 1 кВт·ч', tr.kwh, '₴', (v) => tr.copyWith(kwh: v)),
+        tile('Абонплата ЖКХ', tr.housing, '₴', (v) => tr.copyWith(housing: v)),
         if (tr.isEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
             child: Text(
-              'Тарифи ще не задано — вкажіть їх, щоб комуналка рахувалася за показниками.',
+              'Тарифы ещё не заданы — укажите их, чтобы коммуналка считалась по показаниям.',
               style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.error),
             ),
           ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
           child: Text(
-            'Нові тарифи застосовуються до нових показників. Суми за минулі місяці не змінюються.',
+            'Новые тарифы применяются к новым показаниям. Суммы за прошлые месяцы не меняются.',
             style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
           ),
         ),

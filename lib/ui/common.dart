@@ -174,7 +174,7 @@ class AmountField extends StatefulWidget {
   const AmountField({
     super.key,
     required this.controller,
-    this.label = 'Сума',
+    this.label = 'Сумма',
     this.autofocus = false,
     this.onSubmitted,
     this.suffix = '₴',
@@ -213,7 +213,7 @@ class _AmountFieldState extends State<AmountField> {
     String? error;
     if (text.trim().isNotEmpty) {
       if (v == null) {
-        error = 'Не схоже на число';
+        error = 'Не похоже на число';
       } else if (RegExp(r'\d\s*[+\-−]').hasMatch(text)) {
         helper = '= ${numStr(v)} ${widget.suffix}';
       }
@@ -271,14 +271,14 @@ Future<DateTime?> pickDate(BuildContext context, DateTime initial) {
   );
 }
 
-Future<bool> confirm(BuildContext context, String title, String message, {String action = 'Видалити'}) async {
+Future<bool> confirm(BuildContext context, String title, String message, {String action = 'Удалить'}) async {
   final r = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text(title),
       content: Text(message),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Скасувати')),
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
         FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(action)),
       ],
     ),
@@ -295,7 +295,7 @@ void showSnack(BuildContext context, String text, {VoidCallback? undo}) {
     // С Flutter 3.38+ снекбар с action по умолчанию не исчезает сам.
     persist: false,
     duration: const Duration(seconds: 5),
-    action: undo == null ? null : SnackBarAction(label: 'Скасувати', onPressed: undo),
+    action: undo == null ? null : SnackBarAction(label: 'Отмена', onPressed: undo),
   ));
 }
 
@@ -355,13 +355,13 @@ class _NumberDialogState extends State<_NumberDialog> {
               Text(widget.help!, style: Theme.of(context).textTheme.bodySmall),
               const SizedBox(height: 12),
             ],
-            AmountField(controller: _c, autofocus: true, suffix: widget.suffix, label: 'Значення', onSubmitted: _ok),
+            AmountField(controller: _c, autofocus: true, suffix: widget.suffix, label: 'Значение', onSubmitted: _ok),
           ],
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Скасувати')),
-        FilledButton(onPressed: _ok, child: const Text('Зберегти')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
+        FilledButton(onPressed: _ok, child: const Text('Сохранить')),
       ],
     );
   }
@@ -444,7 +444,7 @@ class _TextDialogState extends State<_TextDialog> {
                 border: const OutlineInputBorder(),
                 suffixIcon: widget.obscure
                     ? IconButton(
-                        tooltip: _hidden ? 'Показати' : 'Сховати',
+                        tooltip: _hidden ? 'Показать' : 'Скрыть',
                         icon: Icon(_hidden ? Icons.visibility : Icons.visibility_off),
                         onPressed: () => setState(() => _hidden = !_hidden),
                       )
@@ -456,7 +456,7 @@ class _TextDialogState extends State<_TextDialog> {
               const SizedBox(height: 8),
               TextButton.icon(
                 icon: const Icon(Icons.casino_outlined),
-                label: const Text('Згенерувати'),
+                label: const Text('Сгенерировать'),
                 onPressed: () => setState(() {
                   _c.text = widget.generate!();
                   _hidden = false;
@@ -467,8 +467,8 @@ class _TextDialogState extends State<_TextDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Скасувати')),
-        FilledButton(onPressed: () => Navigator.pop(context, _c.text.trim()), child: const Text('Зберегти')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
+        FilledButton(onPressed: () => Navigator.pop(context, _c.text.trim()), child: const Text('Сохранить')),
       ],
     );
   }
@@ -491,7 +491,7 @@ Future<ItemEdit?> showItemDialog(
   double? amount,
   DateTime? date,
   bool withDate = false,
-  String nameLabel = 'Назва',
+  String nameLabel = 'Название',
   bool canDelete = false,
 }) {
   return showDialog<ItemEdit>(
@@ -589,10 +589,10 @@ class _ItemDialogState extends State<_ItemDialog> {
           TextButton(
             style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
             onPressed: () => Navigator.pop(context, ItemEdit(name: '', amount: 0, date: _date, delete: true)),
-            child: const Text('Видалити'),
+            child: const Text('Удалить'),
           ),
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Скасувати')),
-        FilledButton(onPressed: _ok, child: const Text('Зберегти')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
+        FilledButton(onPressed: _ok, child: const Text('Сохранить')),
       ],
     );
   }

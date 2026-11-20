@@ -11,7 +11,7 @@ import '../util/file_dialogs.dart';
 import '../util/format.dart';
 import 'common.dart';
 
-String _recordsStr(int n) => '$n ${plural(n, 'запис', 'записи', 'записів')}';
+String _recordsStr(int n) => '$n ${plural(n, 'запись', 'записи', 'записей')}';
 
 /// Раздел «Резервные копии» на вкладке синхронизации.
 class BackupCard extends StatelessWidget {
@@ -24,31 +24,31 @@ class BackupCard extends StatelessWidget {
     final t = Theme.of(context);
     final info = store.epochInfo;
     return SectionCard(
-      title: 'Резервні копії',
+      title: 'Резервные копии',
       children: [
         ListTile(
           leading: const Icon(Icons.save_alt),
-          title: const Text('Створити резервну копію'),
-          subtitle: const Text('Зберегти всі дані у файл'),
+          title: const Text('Создать резервную копию'),
+          subtitle: const Text('Сохранить все данные в файл'),
           onTap: () => _export(context),
         ),
         ListTile(
           leading: const Icon(Icons.settings_backup_restore),
-          title: const Text('Відновити з копії'),
-          subtitle: const Text('Дані з файлу замінять дані на цьому й на інших пристроях'),
+          title: const Text('Восстановить из копии'),
+          subtitle: const Text('Данные из файла заменят данные на этом и на других устройствах'),
           onTap: () => _import(context),
         ),
         ListTile(
           leading: const Icon(Icons.history),
-          title: const Text('Автокопії'),
-          subtitle: const Text('Попередні дані, збережені перед кожною заміною'),
+          title: const Text('Автокопии'),
+          subtitle: const Text('Предыдущие данные, сохранённые перед каждой заменой'),
           onTap: () => _showAutoBackups(context),
         ),
         if (info != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             child: Text(
-              'Поточні дані відновлено з копії на «${info.device}» ${fmtDateTime(info.at)}.',
+              'Текущие данные восстановлены из копии на «${info.device}» ${fmtDateTime(info.at)}.',
               style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
             ),
           ),
@@ -64,10 +64,10 @@ class BackupCard extends StatelessWidget {
       final saved = await saveFileDialog(name, bytes);
       if (saved == null) return; // пользователь закрыл окно
       if (context.mounted) {
-        showSnack(context, 'Резервну копію збережено (${_recordsStr(b.records.length)})');
+        showSnack(context, 'Резервная копия сохранена (${_recordsStr(b.records.length)})');
       }
     } catch (e) {
-      if (context.mounted) showSnack(context, 'Не вдалося зберегти копію: ${_errorText(e)}');
+      if (context.mounted) showSnack(context, 'Не удалось сохранить копию: ${_errorText(e)}');
     }
   }
 
@@ -81,7 +81,7 @@ class BackupCard extends StatelessWidget {
       if (context.mounted) showSnack(context, e.message);
       return;
     } catch (e) {
-      if (context.mounted) showSnack(context, 'Не вдалося відкрити файл: ${_errorText(e)}');
+      if (context.mounted) showSnack(context, 'Не удалось открыть файл: ${_errorText(e)}');
       return;
     }
     if (context.mounted) await _restore(context, b);
@@ -94,12 +94,12 @@ class BackupCard extends StatelessWidget {
     try {
       list = await store.listAutoBackups();
     } catch (e) {
-      if (context.mounted) showSnack(context, 'Не вдалося прочитати автокопії: $e');
+      if (context.mounted) showSnack(context, 'Не удалось прочитать автокопии: $e');
       return;
     }
     if (!context.mounted) return;
     if (list.isEmpty) {
-      showSnack(context, 'Автокопій поки немає — вони з’являються перед заміною даних');
+      showSnack(context, 'Автокопий пока нет — они появляются перед заменой данных');
       return;
     }
     final picked = await showAdaptiveSheet<StoredBackup>(
@@ -113,22 +113,22 @@ class BackupCard extends StatelessWidget {
   Future<void> _restore(BuildContext context, Backup b) async {
     final ok = await confirm(
       context,
-      'Відновити дані з копії?',
-      'Копія від ${fmtDateTime(b.createdAt)}'
-          '${b.device.isEmpty ? '' : ', пристрій «${b.device}»'}, ${_recordsStr(b.records.length)}.\n\n'
-          'Усі поточні дані на цьому пристрої буде замінено даними з копії. Під час синхронізації '
-          'копія матиме пріоритет і так само замінить дані на інших пристроях.\n\n'
-          'Поточні дані спершу збережуться в автокопію.',
-      action: 'Відновити',
+      'Восстановить данные из копии?',
+      'Копия от ${fmtDateTime(b.createdAt)}'
+          '${b.device.isEmpty ? '' : ', устройство «${b.device}»'}, ${_recordsStr(b.records.length)}.\n\n'
+          'Все текущие данные на этом устройстве будут заменены данными из копии. При синхронизации '
+          'копия будет иметь приоритет и так же заменит данные на других устройствах.\n\n'
+          'Текущие данные сначала сохранятся в автокопию.',
+      action: 'Восстановить',
     );
     if (!ok || !context.mounted) return;
     try {
       await store.importBackup(b);
       if (context.mounted) {
-        showSnack(context, 'Дані відновлено з копії. Інші пристрої отримають їх під час синхронізації.');
+        showSnack(context, 'Данные восстановлены из копии. Другие устройства получат их при синхронизации.');
       }
     } catch (e) {
-      if (context.mounted) showSnack(context, 'Не вдалося відновити дані: $e');
+      if (context.mounted) showSnack(context, 'Не удалось восстановить данные: $e');
     }
   }
 }
@@ -148,12 +148,12 @@ class _AutoBackupList extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-          child: Text('Автокопії', style: t.textTheme.titleLarge),
+          child: Text('Автокопии', style: t.textTheme.titleLarge),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: Text(
-            'Зберігаються останні ${Store.maxAutoBackups}. Виберіть копію, щоб відновити її.',
+            'Хранятся последние ${Store.maxAutoBackups}. Выберите копию, чтобы восстановить её.',
             style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
           ),
         ),
@@ -194,22 +194,22 @@ class _AutoBackupList extends StatelessWidget {
 /// Сообщение: данные этого устройства заменены копией с другого устройства.
 Future<void> showReplaceNotice(BuildContext context, ReplaceNotice n) {
   final i = n.info;
-  final text = StringBuffer('На пристрої «${i.device}» ${fmtDateTime(i.at)} відновили резервну копію');
-  if (i.backupAt != null) text.write(' від ${fmtDateTime(i.backupAt!)}');
-  text.write('. Відновлена копія має пріоритет, тому дані на цьому пристрої замінено нею.');
+  final text = StringBuffer('На устройстве «${i.device}» ${fmtDateTime(i.at)} восстановили резервную копию');
+  if (i.backupAt != null) text.write(' от ${fmtDateTime(i.backupAt!)}');
+  text.write('. Восстановленная копия имеет приоритет, поэтому данные на этом устройстве заменены ею.');
   if (n.autoBackup != null) {
-    text.write('\n\nПопередні дані цього пристрою збережено в автокопію: «Синхронізація» → '
-        '«Резервні копії» → «Автокопії». Якщо відновити її, вона так само замінить дані '
-        'й на інших пристроях.');
+    text.write('\n\nПредыдущие данные этого устройства сохранены в автокопию: «Синхронизация» → '
+        '«Резервные копии» → «Автокопии». Если восстановить её, она так же заменит данные '
+        'и на других устройствах.');
   }
   return showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
       icon: const Icon(Icons.settings_backup_restore),
-      title: const Text('Дані замінено резервною копією'),
+      title: const Text('Данные заменены резервной копией'),
       content: Text(text.toString()),
       actions: [
-        FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Зрозуміло')),
+        FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Понятно')),
       ],
     ),
   );

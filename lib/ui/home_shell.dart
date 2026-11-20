@@ -29,10 +29,10 @@ class _HomeShellState extends State<HomeShell> {
 
   static const _destinations = [
     (Icons.today_outlined, Icons.today, 'Бюджет'),
-    (Icons.credit_card_outlined, Icons.credit_card, 'Кредити'),
-    (Icons.tune_outlined, Icons.tune, 'Період'),
-    (Icons.receipt_long_outlined, Icons.receipt_long, 'Комуналка'),
-    (Icons.sync_outlined, Icons.sync, 'Синхронізація'),
+    (Icons.credit_card_outlined, Icons.credit_card, 'Кредиты'),
+    (Icons.tune_outlined, Icons.tune, 'Период'),
+    (Icons.receipt_long_outlined, Icons.receipt_long, 'Коммуналка'),
+    (Icons.sync_outlined, Icons.sync, 'Синхронизация'),
   ];
 
   void _goTab(int i) => setState(() => _tab = i);
@@ -100,8 +100,8 @@ class _HomeShellState extends State<HomeShell> {
             ? FloatingActionButton.extended(
                 onPressed: () => showExpenseEditor(context, date: _defaultExpenseDate(period)),
                 icon: const Icon(Icons.add),
-                label: const Text('Витрата'),
-                tooltip: 'Додати витрату (Ctrl+N)',
+                label: const Text('Расход'),
+                tooltip: 'Добавить расход (Ctrl+N)',
               )
             : null;
 
@@ -214,10 +214,10 @@ class _PeriodTitle extends StatelessWidget {
     final t = Theme.of(context);
     final all = store.periods.reversed.toList();
     return PopupMenuButton<String>(
-      tooltip: 'Вибрати період',
+      tooltip: 'Выбрать период',
       onSelected: (id) => onSelect(id == '__current' ? null : id),
       itemBuilder: (ctx) => [
-        const PopupMenuItem(value: '__current', child: Text('Поточний період')),
+        const PopupMenuItem(value: '__current', child: Text('Текущий период')),
         const PopupMenuDivider(),
         for (final x in all)
           CheckedPopupMenuItem(
@@ -236,7 +236,7 @@ class _PeriodTitle extends StatelessWidget {
               children: [
                 Text(title, overflow: TextOverflow.ellipsis),
                 Text(
-                  '${fmtRange(p.start, p.end)}${isCurrent ? '' : ' · не поточний'}',
+                  '${fmtRange(p.start, p.end)}${isCurrent ? '' : ' · не текущий'}',
                   style: t.textTheme.bodySmall?.copyWith(
                     color: isCurrent ? t.colorScheme.onSurfaceVariant : t.colorScheme.tertiary,
                   ),
@@ -267,23 +267,23 @@ class _SyncButton extends StatelessWidget {
         String tip;
         if (sync.anyBusy) {
           icon = const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2));
-          tip = 'Синхронізація…';
+          tip = 'Синхронизация…';
         } else if (!sync.hasKey) {
           icon = Icon(Icons.sync_disabled, color: t.colorScheme.onSurfaceVariant);
-          tip = 'Синхронізацію не налаштовано';
+          tip = 'Синхронизация не настроена';
         } else if (sync.hasErrors) {
           icon = Icon(Icons.sync_problem, color: t.colorScheme.error);
-          tip = 'Є помилки синхронізації';
+          tip = 'Есть ошибки синхронизации';
         } else if (sync.peers.values.any((p) => p.lastSync != null)) {
           final last = sync.peers.values
               .map((p) => p.lastSync)
               .whereType<DateTime>()
               .reduce((a, b) => a.isAfter(b) ? a : b);
           icon = Icon(Icons.cloud_done_outlined, color: t.colorScheme.primary);
-          tip = 'Синхронізовано: ${fmtTimeAgo(last)}';
+          tip = 'Синхронизировано: ${fmtTimeAgo(last)}';
         } else {
           icon = const Icon(Icons.sync);
-          tip = 'Синхронізувати';
+          tip = 'Синхронизировать';
         }
         return IconButton(
           tooltip: tip,

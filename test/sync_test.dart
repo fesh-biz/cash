@@ -90,7 +90,7 @@ void main() {
     b.addExpense(today(), 100, '');
     final err = await sa.addManual('127.0.0.1:${sb.port}');
     expect(err, isNull, reason: 'устройство добавляется, ошибка — в статусе');
-    expect(sa.peers.values.single.error, contains('Код синхронізації'));
+    expect(sa.peers.values.single.error, contains('Код синхронизации'));
     expect(a.expensesOn(today()), isEmpty);
   });
 }
